@@ -14,13 +14,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Printer } from "lucide-react";
+import { Search, Printer, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { MONTHS } from "@/lib/constants";
 
 interface ReceiptRow {
   id: string;
+  payment_id: string;
   receipt_number: string;
   issued_at: string;
   amount: number;
@@ -37,6 +38,7 @@ export default function ReceiptsPage() {
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -46,10 +48,12 @@ export default function ReceiptsPage() {
       .select(
         `
         id,
+        payment_id,
         receipt_number,
         issued_at,
         voided,
         payment:payments!inner(
+          id,
           amount,
           payment_date,
           month,
@@ -70,6 +74,7 @@ export default function ReceiptsPage() {
 
     const rows: ReceiptRow[] = (data ?? []).map((r: any) => ({
       id: r.id,
+      payment_id: r.payment_id,
       receipt_number: r.receipt_number,
       issued_at: r.issued_at,
       amount: r.payment.amount,
@@ -143,6 +148,35 @@ export default function ReceiptsPage() {
     }
   }
 
+  async function handleDeleteReceipt(receipt: ReceiptRow) {
+    setDeletingId(receipt.id);
+
+    // Delete receipt first, then payment
+    const { error: rErr } = await supabase
+      .from("receipts")
+      .delete()
+      .eq("id", receipt.id);
+    if (rErr) {
+      toast.error("删除收据失败");
+      setDeletingId(null);
+      return;
+    }
+
+    const { error: pErr } = await supabase
+      .from("payments")
+      .delete()
+      .eq("id", receipt.payment_id);
+    if (pErr) {
+      toast.error("删除付款记录失败");
+      setDeletingId(null);
+      return;
+    }
+
+    toast.success("已删除撤回的收据和付款记录");
+    setDeletingId(null);
+    fetchReceipts();
+  }
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">收据</h1>
@@ -205,7 +239,19 @@ export default function ReceiptsPage() {
                         {format(parseISO(receipt.issued_at), "dd/MM/yyyy")}
                       </TableCell>
                       <TableCell className="text-right">
-                        {!isVoided && (
+                        {isVoided ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            title="删除"
+                            disabled={deletingId === receipt.id}
+                            onClick={() => handleDeleteReceipt(receipt)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            删除
+                          </Button>
+                        ) : (
                           <Button
                             variant="ghost"
                             size="sm"

@@ -30,7 +30,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, MessageCircle, History } from "lucide-react";
+import { DollarSign, MessageCircle, History, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { formatPhoneForWhatsApp } from "@/lib/phone";
@@ -89,6 +89,7 @@ export default function FeesPage() {
   const [voidPaymentId, setVoidPaymentId] = useState<string>("");
   const [voidReason, setVoidReason] = useState("");
   const [voidingPayment, setVoidingPayment] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -297,6 +298,29 @@ export default function FeesPage() {
     fetchFees();
   }
 
+  async function handleDeletePayment(paymentId: string) {
+    setDeletingPaymentId(paymentId);
+
+    // Delete receipt first (child), then payment (parent)
+    await supabase.from("receipts").delete().eq("payment_id", paymentId);
+    const { error } = await supabase.from("payments").delete().eq("id", paymentId);
+
+    if (error) {
+      toast.error("删除失败");
+      setDeletingPaymentId(null);
+      return;
+    }
+
+    toast.success("已删除撤回的付款记录");
+    setDeletingPaymentId(null);
+
+    // Refresh history if open
+    if (historyStudent) {
+      openHistory(historyStudent);
+    }
+    fetchFees();
+  }
+
   // Group fee data by class for rendering
   const groupedFeeData = useMemo(() => {
     const groups: { className: string; rows: FeeRow[] }[] = [];
@@ -458,7 +482,19 @@ export default function FeesPage() {
                         RM {Number(payment.amount).toFixed(2)}
                       </span>
                       {payment.voided ? (
-                        <Badge variant="destructive">已撤回</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="destructive">已撤回</Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive"
+                            title="删除"
+                            disabled={deletingPaymentId === payment.id}
+                            onClick={() => handleDeletePayment(payment.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       ) : (
                         <Button
                           variant="outline"
