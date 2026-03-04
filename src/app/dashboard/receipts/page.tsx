@@ -129,7 +129,7 @@ export default function ReceiptsPage() {
         <div class="row"><span class="label">收据号:</span><span>${receipt.receipt_number}</span></div>
         <div class="row"><span class="label">日期:</span><span>${format(parseISO(receipt.issued_at), "dd/MM/yyyy")}</span></div>
         <div class="row"><span class="label">学生:</span><span>${receipt.student_name}</span></div>
-        <div class="row"><span class="label">期间:</span><span>${MONTHS[receipt.month - 1]} ${receipt.year}</span></div>
+        <div class="row"><span class="label">期间:</span><span>${receipt.year}年${receipt.month}月</span></div>
         ${receipt.notes ? `<div class="row"><span class="label">备注:</span><span>${receipt.notes}</span></div>` : ""}
         <div class="divider"></div>
         <div class="total">RM ${Number(receipt.amount).toFixed(2)}</div>
@@ -230,7 +230,7 @@ export default function ReceiptsPage() {
                       </TableCell>
                       <TableCell className={isVoided ? "line-through" : ""}>{receipt.student_name}</TableCell>
                       <TableCell className={isVoided ? "line-through" : ""}>
-                        {MONTHS[receipt.month - 1]} {receipt.year}
+                        {receipt.year}年{receipt.month}月
                       </TableCell>
                       <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
                         RM {Number(receipt.amount).toFixed(2)}

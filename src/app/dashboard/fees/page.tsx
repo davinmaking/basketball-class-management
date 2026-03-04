@@ -460,7 +460,7 @@ export default function FeesPage() {
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            {MONTHS[selectedMonth]} {selectedYear}
+            {selectedYear}年{selectedMonth + 1}月
           </p>
           {loadingHistory ? (
             <p className="text-muted-foreground py-4">加载中...</p>
