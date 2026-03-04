@@ -54,6 +54,38 @@ export type Database = {
           },
         ]
       }
+      credit_notes: {
+        Row: {
+          credit_note_number: string
+          id: string
+          issued_at: string | null
+          refund_id: string
+          voided: boolean
+        }
+        Insert: {
+          credit_note_number: string
+          id?: string
+          issued_at?: string | null
+          refund_id: string
+          voided?: boolean
+        }
+        Update: {
+          credit_note_number?: string
+          id?: string
+          issued_at?: string | null
+          refund_id?: string
+          voided?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_notes_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "refunds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       class_sessions: {
         Row: {
           created_at: string | null
@@ -118,6 +150,65 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      refunds: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          month: number | null
+          notes: string | null
+          refund_date: string
+          student_id: string
+          total_due: number
+          total_paid: number
+          total_sessions: number
+          voided: boolean
+          voided_at: string | null
+          voided_reason: string | null
+          year: number
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          month?: number | null
+          notes?: string | null
+          refund_date?: string
+          student_id: string
+          total_due: number
+          total_paid: number
+          total_sessions: number
+          voided?: boolean
+          voided_at?: string | null
+          voided_reason?: string | null
+          year: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          month?: number | null
+          notes?: string | null
+          refund_date?: string
+          student_id?: string
+          total_due?: number
+          total_paid?: number
+          total_sessions?: number
+          voided?: boolean
+          voided_at?: string | null
+          voided_reason?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"

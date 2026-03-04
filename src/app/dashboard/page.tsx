@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Calendar, ClipboardCheck, DollarSign } from "lucide-react";
+import { Users, Calendar, ClipboardCheck, DollarSign, Undo2 } from "lucide-react";
 import { APP_CONFIG } from "@/lib/config";
 
 export default async function DashboardPage() {
@@ -11,7 +11,7 @@ export default async function DashboardPage() {
   const currentYear = now.getFullYear();
 
   // Get stats
-  const [studentsResult, sessionsResult, attendanceResult, paymentsResult] =
+  const [studentsResult, sessionsResult, attendanceResult, paymentsResult, refundsResult] =
     await Promise.all([
       supabase.from("students").select("id", { count: "exact", head: true }).eq("active", true),
       supabase
@@ -41,6 +41,11 @@ export default async function DashboardPage() {
         .eq("month", currentMonth)
         .eq("year", currentYear)
         .eq("voided", false),
+      supabase
+        .from("refunds")
+        .select("amount")
+        .eq("year", currentYear)
+        .eq("voided", false),
     ]);
 
   const totalStudents = studentsResult.count ?? 0;
@@ -48,6 +53,8 @@ export default async function DashboardPage() {
   const monthAttendances = attendanceResult.count ?? 0;
   const monthPayments =
     paymentsResult.data?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
+  const yearRefunds =
+    refundsResult.data?.reduce((sum, r) => sum + Number(r.amount), 0) ?? 0;
 
   const stats = [
     {
@@ -75,6 +82,15 @@ export default async function DashboardPage() {
       description: `${currentYear}年${currentMonth}月`,
     },
   ];
+
+  if (yearRefunds > 0) {
+    stats.push({
+      title: "本年退费",
+      value: `${APP_CONFIG.currency} ${yearRefunds.toFixed(2)}`,
+      icon: Undo2,
+      description: `${currentYear}年`,
+    });
+  }
 
   return (
     <div>

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ParentReceiptButton } from "./receipt-button";
+import { ParentCreditNoteButton } from "./credit-note-button";
 import { APP_CONFIG } from "@/lib/config";
 
 export default async function ParentViewPage({
@@ -95,6 +96,25 @@ export default async function ParentViewPage({
 
   const receiptMap = new Map(
     (receipts ?? []).map((r) => [r.payment_id, r])
+  );
+
+  // Get refunds with credit notes
+  const { data: refunds } = await supabase
+    .from("refunds")
+    .select(
+      `
+      *,
+      credit_notes(credit_note_number, voided, issued_at)
+    `
+    )
+    .eq("student_id", student.id)
+    .eq("year", displayYear)
+    .eq("voided", false)
+    .order("refund_date", { ascending: false });
+
+  const totalRefunded = (refunds ?? []).reduce(
+    (s, r) => s + Number(r.amount),
+    0
   );
 
   // Calculate monthly summaries
@@ -180,7 +200,7 @@ export default async function ParentViewPage({
         </div>
 
         {/* Fee Summary */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className={`grid gap-4 ${totalRefunded > 0 ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">{displayYear}年总费用</CardTitle>
@@ -197,6 +217,18 @@ export default async function ParentViewPage({
               <div className="text-2xl font-bold">{APP_CONFIG.currency} {totalPaid.toFixed(2)}</div>
             </CardContent>
           </Card>
+          {totalRefunded > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">已退费</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {APP_CONFIG.currency} {totalRefunded.toFixed(2)}
+                </div>
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">余额</CardTitle>
@@ -204,10 +236,10 @@ export default async function ParentViewPage({
             <CardContent>
               <div
                 className={`text-2xl font-bold ${
-                  totalPaid - totalDue >= 0 ? "text-green-600" : "text-destructive"
+                  totalPaid - totalDue - totalRefunded >= 0 ? "text-green-600" : "text-destructive"
                 }`}
               >
-                {APP_CONFIG.currency} {(totalPaid - totalDue).toFixed(2)}
+                {APP_CONFIG.currency} {(totalPaid - totalDue - totalRefunded).toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -318,6 +350,64 @@ export default async function ParentViewPage({
                               month={payment.month}
                               year={payment.year}
                               notes={payment.notes}
+                            />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Refunds & Credit Notes */}
+        {(refunds ?? []).length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>退费记录</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>日期</TableHead>
+                    <TableHead>期间</TableHead>
+                    <TableHead className="text-right">金额</TableHead>
+                    <TableHead className="text-right">退费单</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(refunds ?? []).map((refund) => {
+                    const creditNote = (refund.credit_notes as any[])?.[0];
+                    return (
+                      <TableRow key={refund.id}>
+                        <TableCell>
+                          {format(parseISO(refund.refund_date), "dd/MM/yyyy")}
+                        </TableCell>
+                        <TableCell>
+                          {refund.month
+                            ? `${refund.year}年${refund.month}月`
+                            : `${refund.year}年（全年）`}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {APP_CONFIG.currency} {Number(refund.amount).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {creditNote && !creditNote.voided && (
+                            <ParentCreditNoteButton
+                              creditNoteNumber={creditNote.credit_note_number}
+                              issuedAt={creditNote.issued_at ?? ""}
+                              studentName={student.name}
+                              schoolClass={student.school_class}
+                              amount={Number(refund.amount)}
+                              year={refund.year}
+                              month={refund.month}
+                              totalPaid={Number(refund.total_paid)}
+                              totalSessions={refund.total_sessions}
+                              totalDue={Number(refund.total_due)}
+                              notes={refund.notes}
                             />
                           )}
                         </TableCell>

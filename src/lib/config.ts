@@ -10,4 +10,5 @@ export const APP_CONFIG = {
   feePerSession: Number(process.env.NEXT_PUBLIC_FEE_PER_SESSION) || 5,
   receiptPrefix: process.env.NEXT_PUBLIC_RECEIPT_PREFIX || "RCP",
   currency: process.env.NEXT_PUBLIC_CURRENCY || "RM",
+  creditNotePrefix: process.env.NEXT_PUBLIC_CREDIT_NOTE_PREFIX || "CN",
 };

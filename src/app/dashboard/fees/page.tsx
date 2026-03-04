@@ -40,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { DollarSign, MessageCircle, History, Trash2 } from "lucide-react";
+import { DollarSign, MessageCircle, History, Trash2, Undo2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { formatPhoneForWhatsApp } from "@/lib/phone";
@@ -61,6 +61,27 @@ interface HistoryPayment {
   voided_at: string | null;
   voided_reason: string | null;
   receipts: { receipt_number: string; voided: boolean }[];
+}
+
+interface HistoryRefund {
+  id: string;
+  amount: number;
+  refund_date: string;
+  year: number;
+  month: number | null;
+  notes: string | null;
+  voided: boolean;
+  voided_at: string | null;
+  voided_reason: string | null;
+  credit_notes: { credit_note_number: string; voided: boolean }[];
+}
+
+interface RefundCalc {
+  totalPaid: number;
+  totalSessions: number;
+  totalDue: number;
+  existingRefunds: number;
+  refundable: number;
 }
 
 interface FeeRow {
@@ -127,6 +148,28 @@ export default function FeesPage() {
   const [voidingPayment, setVoidingPayment] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const [confirmDeletePaymentId, setConfirmDeletePaymentId] = useState<string | null>(null);
+
+  // Refund dialog state
+  const [showRefund, setShowRefund] = useState(false);
+  const [refundStudent, setRefundStudent] = useState<Student | null>(null);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundNotes, setRefundNotes] = useState("");
+  const [refundDate, setRefundDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [refundCalc, setRefundCalc] = useState<RefundCalc | null>(null);
+  const [savingRefund, setSavingRefund] = useState(false);
+  const [refundPeriodType, setRefundPeriodType] = useState<"month" | "year">("year");
+  const [loadingRefundCalc, setLoadingRefundCalc] = useState(false);
+
+  // History refunds
+  const [historyRefunds, setHistoryRefunds] = useState<HistoryRefund[]>([]);
+  const [voidRefundId, setVoidRefundId] = useState<string>("");
+  const [showVoidRefund, setShowVoidRefund] = useState(false);
+  const [voidRefundReason, setVoidRefundReason] = useState("");
+  const [voidingRefund, setVoidingRefund] = useState(false);
+  const [deletingRefundId, setDeletingRefundId] = useState<string | null>(null);
+  const [confirmDeleteRefundId, setConfirmDeleteRefundId] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -293,21 +336,233 @@ export default function FeesPage() {
     fetchFees();
   }
 
+  async function openRefundDialog(student: Student) {
+    setRefundStudent(student);
+    setRefundAmount("");
+    setRefundNotes("");
+    setRefundDate(new Date().toISOString().split("T")[0]);
+    setRefundCalc(null);
+    setRefundPeriodType("year");
+    setShowRefund(true);
+    setLoadingRefundCalc(true);
+
+    await calculateRefund(student, "year");
+  }
+
+  async function calculateRefund(student: Student, periodType: "month" | "year") {
+    setLoadingRefundCalc(true);
+
+    // Get date range for the period
+    let startDate: string;
+    let endDate: string;
+    const year = selectedYear;
+
+    if (periodType === "month") {
+      const month = selectedMonth + 1;
+      const monthStr = String(month).padStart(2, "0");
+      startDate = `${year}-${monthStr}-01`;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const nextYear = month === 12 ? year + 1 : year;
+      endDate = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+    } else {
+      startDate = `${year}-01-01`;
+      endDate = `${year + 1}-01-01`;
+    }
+
+    // Query payments, sessions, attendance, existing refunds in parallel
+    const [paymentsRes, sessionsRes, refundsRes] = await Promise.all([
+      // Total payments in period
+      periodType === "month"
+        ? supabase
+            .from("payments")
+            .select("amount")
+            .eq("student_id", student.id)
+            .eq("month", selectedMonth + 1)
+            .eq("year", year)
+            .eq("voided", false)
+        : supabase
+            .from("payments")
+            .select("amount")
+            .eq("student_id", student.id)
+            .eq("year", year)
+            .eq("voided", false),
+      // Sessions in period
+      supabase
+        .from("class_sessions")
+        .select("id")
+        .gte("session_date", startDate)
+        .lt("session_date", endDate),
+      // Existing refunds in period
+      periodType === "month"
+        ? supabase
+            .from("refunds")
+            .select("amount")
+            .eq("student_id", student.id)
+            .eq("year", year)
+            .eq("month", selectedMonth + 1)
+            .eq("voided", false)
+        : supabase
+            .from("refunds")
+            .select("amount")
+            .eq("student_id", student.id)
+            .eq("year", year)
+            .is("month", null)
+            .eq("voided", false),
+    ]);
+
+    const totalPaid = (paymentsRes.data ?? []).reduce(
+      (s, p) => s + Number(p.amount),
+      0
+    );
+
+    const sessionIds = (sessionsRes.data ?? []).map((s) => s.id);
+    let totalSessions = 0;
+    if (sessionIds.length > 0) {
+      const { count } = await supabase
+        .from("attendance")
+        .select("*", { count: "exact", head: true })
+        .eq("student_id", student.id)
+        .in("session_id", sessionIds)
+        .eq("present", true)
+        .eq("fee_exempt", false);
+      totalSessions = count ?? 0;
+    }
+
+    const totalDue = totalSessions * APP_CONFIG.feePerSession;
+    const existingRefunds = (refundsRes.data ?? []).reduce(
+      (s, r) => s + Number(r.amount),
+      0
+    );
+    const refundable = Math.max(0, totalPaid - totalDue - existingRefunds);
+
+    const calc: RefundCalc = {
+      totalPaid,
+      totalSessions,
+      totalDue,
+      existingRefunds,
+      refundable,
+    };
+
+    setRefundCalc(calc);
+    setRefundAmount(refundable > 0 ? refundable.toFixed(2) : "");
+    setLoadingRefundCalc(false);
+  }
+
+  async function handleRecordRefund() {
+    if (!refundStudent || !refundAmount || !refundCalc) return;
+    const amount = parseFloat(refundAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("请输入有效金额");
+      return;
+    }
+
+    if (amount > refundCalc.refundable) {
+      toast.error("退费金额超过可退金额");
+      return;
+    }
+
+    setSavingRefund(true);
+
+    // Insert refund
+    const { data: refundData, error: refundError } = await supabase
+      .from("refunds")
+      .insert({
+        student_id: refundStudent.id,
+        amount,
+        refund_date: refundDate,
+        year: selectedYear,
+        month: refundPeriodType === "month" ? selectedMonth + 1 : null,
+        total_paid: refundCalc.totalPaid,
+        total_sessions: refundCalc.totalSessions,
+        total_due: refundCalc.totalDue,
+        notes: refundNotes.trim() || null,
+      })
+      .select()
+      .single();
+
+    if (refundError) {
+      toast.error("记录退费失败");
+      setSavingRefund(false);
+      return;
+    }
+
+    // Auto-generate credit note with retry on conflict
+    let creditNoteNumber = "";
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const { data: lastNote } = await supabase
+        .from("credit_notes")
+        .select("credit_note_number")
+        .like(
+          "credit_note_number",
+          `${APP_CONFIG.creditNotePrefix}-${selectedYear}-%`
+        )
+        .order("credit_note_number", { ascending: false })
+        .limit(1)
+        .single();
+
+      let nextNum = 1;
+      if (lastNote?.credit_note_number) {
+        const parts = lastNote.credit_note_number.split("-");
+        nextNum = parseInt(parts[parts.length - 1]) + 1;
+      }
+
+      creditNoteNumber = `${APP_CONFIG.creditNotePrefix}-${selectedYear}-${String(nextNum).padStart(3, "0")}`;
+
+      const { error: cnError } = await supabase.from("credit_notes").insert({
+        refund_id: refundData.id,
+        credit_note_number: creditNoteNumber,
+      });
+
+      if (!cnError) break;
+
+      if (cnError.code === "23505" && attempt < maxRetries - 1) {
+        continue;
+      }
+
+      toast.error("生成退费单失败，但退费已记录");
+      setSavingRefund(false);
+      setShowRefund(false);
+      fetchFees();
+      return;
+    }
+
+    toast.success(
+      `已记录退费 ${APP_CONFIG.currency}${amount.toFixed(2)}。退费单: ${creditNoteNumber}`
+    );
+    setSavingRefund(false);
+    setShowRefund(false);
+    fetchFees();
+  }
+
   async function openHistory(student: Student) {
     setHistoryStudent(student);
     setShowHistory(true);
     setLoadingHistory(true);
 
     const month = selectedMonth + 1;
-    const { data } = await supabase
-      .from("payments")
-      .select("*, receipts(receipt_number, voided)")
-      .eq("student_id", student.id)
-      .eq("month", month)
-      .eq("year", selectedYear)
-      .order("payment_date", { ascending: false });
+    const [paymentsData, refundsData] = await Promise.all([
+      supabase
+        .from("payments")
+        .select("*, receipts(receipt_number, voided)")
+        .eq("student_id", student.id)
+        .eq("month", month)
+        .eq("year", selectedYear)
+        .order("payment_date", { ascending: false }),
+      supabase
+        .from("refunds")
+        .select("*, credit_notes(credit_note_number, voided)")
+        .eq("student_id", student.id)
+        .eq("year", selectedYear)
+        .order("refund_date", { ascending: false }),
+    ]);
 
-    setHistoryPayments(data ?? []);
+    setHistoryPayments(paymentsData.data ?? []);
+    // Filter refunds: show if month matches or full-year refund
+    const allRefunds = (refundsData.data ?? []) as HistoryRefund[];
+    setHistoryRefunds(
+      allRefunds.filter((r) => r.month === month || r.month === null)
+    );
     setLoadingHistory(false);
   }
 
@@ -380,6 +635,77 @@ export default function FeesPage() {
     if (historyStudent) {
       openHistory(historyStudent);
     }
+    fetchFees();
+  }
+
+  // ── Refund void/delete handlers ─────────────────────────
+
+  function openVoidRefundDialog(refundId: string) {
+    setVoidRefundId(refundId);
+    setVoidRefundReason("");
+    setShowVoidRefund(true);
+  }
+
+  async function handleVoidRefund() {
+    if (!voidRefundId) return;
+    setVoidingRefund(true);
+
+    const { error: refErr } = await supabase
+      .from("refunds")
+      .update({
+        voided: true,
+        voided_at: new Date().toISOString(),
+        voided_reason: voidRefundReason.trim() || null,
+      })
+      .eq("id", voidRefundId);
+
+    if (refErr) {
+      toast.error("撤回退费失败");
+      setVoidingRefund(false);
+      return;
+    }
+
+    await supabase
+      .from("credit_notes")
+      .update({ voided: true })
+      .eq("refund_id", voidRefundId);
+
+    toast.success("退费已撤回");
+    setVoidingRefund(false);
+    setShowVoidRefund(false);
+
+    if (historyStudent) openHistory(historyStudent);
+    fetchFees();
+  }
+
+  async function handleDeleteRefund(refundId: string) {
+    setDeletingRefundId(refundId);
+    setConfirmDeleteRefundId(null);
+
+    const { error: cnErr } = await supabase
+      .from("credit_notes")
+      .delete()
+      .eq("refund_id", refundId);
+    if (cnErr) {
+      toast.error("删除退费单失败");
+      setDeletingRefundId(null);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("refunds")
+      .delete()
+      .eq("id", refundId);
+    if (error) {
+      toast.error("删除退费记录失败");
+      setDeletingRefundId(null);
+      return;
+    }
+
+    toast.success("已删除撤回的退费记录");
+    setDeletingRefundId(null);
+
+    if (historyStudent) openHistory(historyStudent);
     fetchFees();
   }
 
@@ -504,6 +830,7 @@ export default function FeesPage() {
                     selectedYear={selectedYear}
                     onOpenHistory={openHistory}
                     onOpenPayment={openPaymentDialog}
+                    onOpenRefund={openRefundDialog}
                   />
                 ))
               )}
@@ -529,67 +856,150 @@ export default function FeesPage() {
           </p>
           {loadingHistory ? (
             <p className="text-muted-foreground py-4">加载中...</p>
-          ) : historyPayments.length === 0 ? (
-            <p className="text-muted-foreground py-4">暂无付款记录</p>
+          ) : historyPayments.length === 0 && historyRefunds.length === 0 ? (
+            <p className="text-muted-foreground py-4">暂无记录</p>
           ) : (
             <div className="space-y-3">
-              {historyPayments.map((payment) => {
-                const receipt = payment.receipts?.[0];
-                return (
-                  <div
-                    key={payment.id}
-                    className={`border rounded-lg p-3 ${
-                      payment.voided ? "opacity-50" : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`font-medium ${payment.voided ? "line-through" : ""}`}>
-                        {APP_CONFIG.currency} {Number(payment.amount).toFixed(2)}
-                      </span>
-                      {payment.voided ? (
-                        <div className="flex items-center gap-2">
-                          <Badge variant="destructive">已撤回</Badge>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-destructive"
-                            title="删除"
-                            disabled={deletingPaymentId === payment.id}
-                            onClick={() => setConfirmDeletePaymentId(payment.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+              {/* Payments */}
+              {historyPayments.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    付款
+                  </p>
+                  {historyPayments.map((payment) => {
+                    const receipt = payment.receipts?.[0];
+                    return (
+                      <div
+                        key={payment.id}
+                        className={`border rounded-lg p-3 ${
+                          payment.voided ? "opacity-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`font-medium ${payment.voided ? "line-through" : ""}`}>
+                            {APP_CONFIG.currency} {Number(payment.amount).toFixed(2)}
+                          </span>
+                          {payment.voided ? (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="destructive">已撤回</Badge>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive"
+                                title="删除"
+                                disabled={deletingPaymentId === payment.id}
+                                onClick={() => setConfirmDeletePaymentId(payment.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-xs text-destructive"
+                              onClick={() => openVoidDialog(payment.id)}
+                            >
+                              撤回
+                            </Button>
+                          )}
                         </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-6 text-xs text-destructive"
-                          onClick={() => openVoidDialog(payment.id)}
-                        >
-                          撤回
-                        </Button>
-                      )}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {format(parseISO(payment.payment_date), "dd/MM/yyyy")}
-                      {receipt && (
-                        <span className="ml-2">
-                          收据: {receipt.receipt_number}
-                        </span>
-                      )}
-                    </div>
-                    {payment.notes && (
-                      <p className="text-sm mt-1">{payment.notes}</p>
-                    )}
-                    {payment.voided && payment.voided_reason && (
-                      <p className="text-sm text-destructive mt-1">
-                        撤回原因: {payment.voided_reason}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {format(parseISO(payment.payment_date), "dd/MM/yyyy")}
+                          {receipt && (
+                            <span className="ml-2">
+                              收据: {receipt.receipt_number}
+                            </span>
+                          )}
+                        </div>
+                        {payment.notes && (
+                          <p className="text-sm mt-1">{payment.notes}</p>
+                        )}
+                        {payment.voided && payment.voided_reason && (
+                          <p className="text-sm text-destructive mt-1">
+                            撤回原因: {payment.voided_reason}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Refunds */}
+              {historyRefunds.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-4">
+                    退费
+                  </p>
+                  {historyRefunds.map((refund) => {
+                    const cn = refund.credit_notes?.[0];
+                    const periodLabel = refund.month
+                      ? `${refund.month}/${refund.year}`
+                      : `${refund.year}年全年`;
+                    return (
+                      <div
+                        key={refund.id}
+                        className={`border rounded-lg p-3 border-blue-200 ${
+                          refund.voided ? "opacity-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                              退费
+                            </Badge>
+                            <span className={`font-medium ${refund.voided ? "line-through" : ""}`}>
+                              {APP_CONFIG.currency} {Number(refund.amount).toFixed(2)}
+                            </span>
+                          </div>
+                          {refund.voided ? (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="destructive">已撤回</Badge>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive"
+                                title="删除"
+                                disabled={deletingRefundId === refund.id}
+                                onClick={() => setConfirmDeleteRefundId(refund.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-6 text-xs text-destructive"
+                              onClick={() => openVoidRefundDialog(refund.id)}
+                            >
+                              撤回
+                            </Button>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {format(parseISO(refund.refund_date), "dd/MM/yyyy")}
+                          <span className="ml-2">期间: {periodLabel}</span>
+                          {cn && (
+                            <span className="ml-2">
+                              退费单: {cn.credit_note_number}
+                            </span>
+                          )}
+                        </div>
+                        {refund.notes && (
+                          <p className="text-sm mt-1">{refund.notes}</p>
+                        )}
+                        {refund.voided && refund.voided_reason && (
+                          <p className="text-sm text-destructive mt-1">
+                            撤回原因: {refund.voided_reason}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
         </DialogContent>
@@ -644,6 +1054,180 @@ export default function FeesPage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => confirmDeletePaymentId && handleDeletePayment(confirmDeletePaymentId)}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Refund dialog */}
+      <Dialog open={showRefund} onOpenChange={setShowRefund}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              退费 — {refundStudent?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>退费范围</Label>
+              <Select
+                value={refundPeriodType}
+                onValueChange={(v) => {
+                  const pt = v as "month" | "year";
+                  setRefundPeriodType(pt);
+                  if (refundStudent) calculateRefund(refundStudent, pt);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="year">{selectedYear}年（全年）</SelectItem>
+                  <SelectItem value="month">
+                    {selectedYear}年{selectedMonth + 1}月
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {loadingRefundCalc ? (
+              <p className="text-muted-foreground text-sm py-2">计算中...</p>
+            ) : refundCalc ? (
+              <div className="border rounded-lg p-3 bg-muted/50 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">已付总额:</span>
+                  <span>{APP_CONFIG.currency} {refundCalc.totalPaid.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">收费课次:</span>
+                  <span>{refundCalc.totalSessions}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">应缴费用:</span>
+                  <span>{APP_CONFIG.currency} {refundCalc.totalDue.toFixed(2)}</span>
+                </div>
+                {refundCalc.existingRefunds > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">已退费:</span>
+                    <span>{APP_CONFIG.currency} {refundCalc.existingRefunds.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t pt-1 font-medium">
+                  <span>可退金额:</span>
+                  <span className="text-blue-600">
+                    {APP_CONFIG.currency} {refundCalc.refundable.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              <Label htmlFor="refund-amount">退费金额 ({APP_CONFIG.currency})</Label>
+              <Input
+                id="refund-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                max={refundCalc?.refundable}
+                value={refundAmount}
+                onChange={(e) => setRefundAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-date">退费日期</Label>
+              <Input
+                id="refund-date"
+                type="date"
+                value={refundDate}
+                onChange={(e) => setRefundDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="refund-notes">备注</Label>
+              <Textarea
+                id="refund-notes"
+                placeholder="例如: 年终退费, 未出席退款等"
+                value={refundNotes}
+                onChange={(e) => setRefundNotes(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowRefund(false)}>
+                取消
+              </Button>
+              <Button
+                onClick={handleRecordRefund}
+                disabled={
+                  savingRefund ||
+                  loadingRefundCalc ||
+                  !refundCalc ||
+                  refundCalc.refundable <= 0
+                }
+              >
+                {savingRefund ? "保存中..." : "确认退费"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Void refund dialog */}
+      <Dialog open={showVoidRefund} onOpenChange={setShowVoidRefund}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>撤回退费</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="void-refund-reason">撤回原因（可选）</Label>
+              <Textarea
+                id="void-refund-reason"
+                placeholder="例：金额错误, 重复记录等"
+                value={voidRefundReason}
+                onChange={(e) => setVoidRefundReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowVoidRefund(false)}
+              >
+                取消
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleVoidRefund}
+                disabled={voidingRefund}
+              >
+                {voidingRefund ? "撤回中..." : "确认撤回"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete refund confirmation */}
+      <AlertDialog
+        open={!!confirmDeleteRefundId}
+        onOpenChange={(open) => !open && setConfirmDeleteRefundId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要永久删除此撤回的退费记录及其退费单吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() =>
+                confirmDeleteRefundId &&
+                handleDeleteRefund(confirmDeleteRefundId)
+              }
             >
               删除
             </AlertDialogAction>
@@ -712,12 +1296,14 @@ function FeeGroupRows({
   selectedYear,
   onOpenHistory,
   onOpenPayment,
+  onOpenRefund,
 }: {
   group: { className: string; rows: FeeRow[] };
   selectedMonth: number;
   selectedYear: number;
   onOpenHistory: (student: Student) => void;
   onOpenPayment: (student: Student, suggestedAmount: number) => void;
+  onOpenRefund: (student: Student) => void;
 }) {
   return (
     <>
@@ -796,6 +1382,17 @@ function FeeGroupRows({
                     </a>
                   </Button>
                 </div>
+              )}
+              {row.balance > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-blue-600 border-blue-200"
+                  onClick={() => onOpenRefund(row.student)}
+                >
+                  <Undo2 className="h-4 w-4 mr-1" />
+                  退费
+                </Button>
               )}
               <Button
                 variant="outline"
