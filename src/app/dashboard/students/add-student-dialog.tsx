@@ -30,6 +30,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
     phone: "",
     health_notes: "",
     fee_exempt: false,
+    active: true,
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -48,6 +49,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
       phone: form.phone.trim() || null,
       health_notes: form.health_notes.trim() || null,
       fee_exempt: form.fee_exempt,
+      active: form.active,
     });
 
     if (error) {
@@ -64,6 +66,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
       phone: "",
       health_notes: "",
       fee_exempt: false,
+      active: true,
     });
     setLoading(false);
     onOpenChange(false);

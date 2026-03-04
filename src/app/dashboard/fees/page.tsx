@@ -30,9 +30,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Plus, Receipt } from "lucide-react";
+import { DollarSign, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { formatPhoneForWhatsApp } from "@/lib/phone";
 
 const FEE_PER_SESSION = 5; // RM5
 
@@ -49,6 +50,26 @@ interface FeeRow {
   amountDue: number;
   totalPaid: number;
   balance: number;
+}
+
+function getWhatsAppUrl(
+  student: Student,
+  amountDue: number,
+  month: number,
+  year: number
+): string | null {
+  const phone = formatPhoneForWhatsApp(student.phone);
+  if (!phone) return null;
+
+  const monthName = MONTHS[month - 1];
+  const message = encodeURIComponent(
+    `您好，这是${student.name}的篮球训练班费用提醒。\n\n` +
+      `${monthName} ${year}年\n` +
+      `未缴金额: RM${amountDue.toFixed(2)}\n\n` +
+      `请尽快缴费，谢谢！`
+  );
+
+  return `https://wa.me/${phone}?text=${message}`;
 }
 
 export default function FeesPage() {
@@ -114,14 +135,16 @@ export default function FeesPage() {
       paymentSums[p.student_id] = (paymentSums[p.student_id] ?? 0) + Number(p.amount);
     });
 
-    const rows: FeeRow[] = students.map((student) => {
-      const sessionsAttended = attendanceCounts[student.id] ?? 0;
-      const amountDue = student.fee_exempt ? 0 : sessionsAttended * FEE_PER_SESSION;
-      const totalPaid = paymentSums[student.id] ?? 0;
-      const balance = totalPaid - amountDue;
+    const rows: FeeRow[] = students
+      .filter((s) => s.active !== false)
+      .map((student) => {
+        const sessionsAttended = attendanceCounts[student.id] ?? 0;
+        const amountDue = student.fee_exempt ? 0 : sessionsAttended * FEE_PER_SESSION;
+        const totalPaid = paymentSums[student.id] ?? 0;
+        const balance = totalPaid - amountDue;
 
-      return { student, sessionsAttended, amountDue, totalPaid, balance };
-    });
+        return { student, sessionsAttended, amountDue, totalPaid, balance };
+      });
 
     setFeeData(rows);
     setLoading(false);
@@ -332,21 +355,44 @@ export default function FeesPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
-                      {!row.student.fee_exempt && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            openPaymentDialog(
-                              row.student,
-                              row.balance < 0 ? Math.abs(row.balance) : 0
-                            )
-                          }
-                        >
-                          <DollarSign className="h-4 w-4 mr-1" />
-                          付款
-                        </Button>
-                      )}
+                      <div className="flex justify-end gap-1">
+                        {row.balance < 0 && row.student.phone && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            asChild
+                            title="发送WhatsApp付费提醒"
+                          >
+                            <a
+                              href={getWhatsAppUrl(
+                                row.student,
+                                Math.abs(row.balance),
+                                selectedMonth + 1,
+                                selectedYear
+                              )!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <MessageCircle className="h-4 w-4 text-green-600" />
+                            </a>
+                          </Button>
+                        )}
+                        {!row.student.fee_exempt && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              openPaymentDialog(
+                                row.student,
+                                row.balance < 0 ? Math.abs(row.balance) : 0
+                              )
+                            }
+                          >
+                            <DollarSign className="h-4 w-4 mr-1" />
+                            付款
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

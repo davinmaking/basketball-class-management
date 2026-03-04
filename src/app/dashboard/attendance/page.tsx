@@ -22,10 +22,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { format, parseISO } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Save, AlertTriangle } from "lucide-react";
 
 type Session = Tables<"class_sessions">;
 type Student = Tables<"students">;
@@ -52,6 +58,9 @@ export default function AttendancePage() {
   >([]);
 
   const supabase = createClient();
+
+  // Active students only
+  const activeStudents = students.filter((s) => s.active !== false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -91,12 +100,13 @@ export default function AttendancePage() {
         .eq("session_id", selectedSession);
 
       const map: Record<string, boolean> = {};
-      students.forEach((s) => (map[s.id] = false));
+      activeStudents.forEach((s) => (map[s.id] = false));
       data?.forEach((a) => (map[a.student_id] = a.present ?? false));
       setAttendance(map);
     }
 
     loadAttendance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSession, students, supabase]);
 
   // Load summary data
@@ -117,11 +127,13 @@ export default function AttendancePage() {
       });
 
       setSummaryData(
-        students.map((s) => ({
-          student: s,
-          attended: counts[s.id] ?? 0,
-          total: sessions.length,
-        }))
+        students
+          .filter((s) => s.active !== false)
+          .map((s) => ({
+            student: s,
+            attended: counts[s.id] ?? 0,
+            total: sessions.length,
+          }))
       );
     }
 
@@ -155,196 +167,221 @@ export default function AttendancePage() {
 
   function toggleAll(checked: boolean) {
     const updated: Record<string, boolean> = {};
-    students.forEach((s) => (updated[s.id] = checked));
+    activeStudents.forEach((s) => (updated[s.id] = checked));
     setAttendance(updated);
   }
 
   const presentCount = Object.values(attendance).filter(Boolean).length;
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">出勤</h1>
+    <TooltipProvider>
+      <div>
+        <h1 className="text-2xl font-bold mb-6">出勤</h1>
 
-      <div className="flex gap-3 mb-6">
-        <Select
-          value={String(selectedMonth)}
-          onValueChange={(v) => {
-            setSelectedMonth(Number(v));
-            setSelectedSession("");
-          }}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {MONTHS.map((month, idx) => (
-              <SelectItem key={idx} value={String(idx)}>
-                {month}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-3 mb-6">
+          <Select
+            value={String(selectedMonth)}
+            onValueChange={(v) => {
+              setSelectedMonth(Number(v));
+              setSelectedSession("");
+            }}
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((month, idx) => (
+                <SelectItem key={idx} value={String(idx)}>
+                  {month}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select
-          value={String(selectedYear)}
-          onValueChange={(v) => {
-            setSelectedYear(Number(v));
-            setSelectedSession("");
-          }}
-        >
-          <SelectTrigger className="w-[100px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[2025, 2026, 2027].map((year) => (
-              <SelectItem key={year} value={String(year)}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(v) => {
+              setSelectedYear(Number(v));
+              setSelectedSession("");
+            }}
+          >
+            <SelectTrigger className="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[2025, 2026, 2027].map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="take">记录出勤</TabsTrigger>
-          <TabsTrigger value="summary">月度汇总</TabsTrigger>
-        </TabsList>
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="take">记录出勤</TabsTrigger>
+            <TabsTrigger value="summary">月度汇总</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="take" className="mt-4">
-          {loading ? (
-            <p className="text-muted-foreground">加载中...</p>
-          ) : sessions.length === 0 ? (
+          <TabsContent value="take" className="mt-4">
+            {loading ? (
+              <p className="text-muted-foreground">加载中...</p>
+            ) : sessions.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  本月没有训练课。请先添加训练课。
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <Label className="text-sm font-medium mb-2 block">
+                    选择训练课
+                  </Label>
+                  <Select value={selectedSession} onValueChange={setSelectedSession}>
+                    <SelectTrigger className="w-[300px]">
+                      <SelectValue placeholder="选择日期..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sessions.map((session) => (
+                        <SelectItem key={session.id} value={session.id}>
+                          {format(parseISO(session.session_date), "d MMMM yyyy (EEEE)", {
+                            locale: zhCN,
+                          })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedSession && (
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle className="text-base">
+                        出勤: {presentCount} / {activeStudents.length}
+                      </CardTitle>
+                      <Button onClick={saveAttendance} disabled={saving} size="sm">
+                        <Save className="h-4 w-4 mr-2" />
+                        {saving ? "保存中..." : "保存"}
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="mb-3 flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleAll(true)}
+                        >
+                          全选
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleAll(false)}
+                        >
+                          取消全选
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {activeStudents.map((student) => (
+                          <div
+                            key={student.id}
+                            className="flex items-center gap-3 p-2 rounded hover:bg-accent"
+                          >
+                            <Checkbox
+                              checked={attendance[student.id] ?? false}
+                              onCheckedChange={(checked) =>
+                                setAttendance({
+                                  ...attendance,
+                                  [student.id]: checked === true,
+                                })
+                              }
+                            />
+                            <span className="font-medium">{student.name}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {student.school_class}
+                            </span>
+                            {student.health_notes && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex items-center gap-1 text-orange-600">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <span className="text-xs font-medium">健康注意</span>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-xs">
+                                  <p className="text-sm">{student.health_notes}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="summary" className="mt-4">
             <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                本月没有训练课。请先添加训练课。
+              <CardHeader>
+                <CardTitle>
+                  {selectedYear}年{MONTHS[selectedMonth]}汇总
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {summaryData.length === 0 ? (
+                  <p className="text-muted-foreground">暂无出勤数据</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>学生</TableHead>
+                        <TableHead>班级</TableHead>
+                        <TableHead className="text-center">出勤</TableHead>
+                        <TableHead className="text-center">总课次</TableHead>
+                        <TableHead className="text-center">出勤率 (%)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {summaryData.map(({ student, attended, total }) => (
+                        <TableRow key={student.id}>
+                          <TableCell className="font-medium">
+                            {student.name}
+                            {student.health_notes && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertTriangle className="h-3.5 w-3.5 text-orange-500 inline ml-1" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-sm">{student.health_notes}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </TableCell>
+                          <TableCell>{student.school_class ?? "-"}</TableCell>
+                          <TableCell className="text-center">{attended}</TableCell>
+                          <TableCell className="text-center">{total}</TableCell>
+                          <TableCell className="text-center">
+                            {total > 0
+                              ? `${Math.round((attended / total) * 100)}%`
+                              : "-"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
-          ) : (
-            <>
-              <div className="mb-4">
-                <Label className="text-sm font-medium mb-2 block">
-                  选择训练课
-                </Label>
-                <Select value={selectedSession} onValueChange={setSelectedSession}>
-                  <SelectTrigger className="w-[300px]">
-                    <SelectValue placeholder="选择日期..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sessions.map((session) => (
-                      <SelectItem key={session.id} value={session.id}>
-                        {format(parseISO(session.session_date), "d MMMM yyyy (EEEE)", {
-                          locale: zhCN,
-                        })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedSession && (
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-base">
-                      出勤: {presentCount} / {students.length}
-                    </CardTitle>
-                    <Button onClick={saveAttendance} disabled={saving} size="sm">
-                      <Save className="h-4 w-4 mr-2" />
-                      {saving ? "保存中..." : "保存"}
-                    </Button>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="mb-3 flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleAll(true)}
-                      >
-                        全选
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleAll(false)}
-                      >
-                        取消全选
-                      </Button>
-                    </div>
-
-                    <div className="space-y-2">
-                      {students.map((student) => (
-                        <div
-                          key={student.id}
-                          className="flex items-center gap-3 p-2 rounded hover:bg-accent"
-                        >
-                          <Checkbox
-                            checked={attendance[student.id] ?? false}
-                            onCheckedChange={(checked) =>
-                              setAttendance({
-                                ...attendance,
-                                [student.id]: checked === true,
-                              })
-                            }
-                          />
-                          <span className="font-medium">{student.name}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {student.school_class}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          )}
-        </TabsContent>
-
-        <TabsContent value="summary" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {selectedYear}年{MONTHS[selectedMonth]}汇总
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {summaryData.length === 0 ? (
-                <p className="text-muted-foreground">暂无出勤数据</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>学生</TableHead>
-                      <TableHead>班级</TableHead>
-                      <TableHead className="text-center">出勤</TableHead>
-                      <TableHead className="text-center">总课次</TableHead>
-                      <TableHead className="text-center">出勤率 (%)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {summaryData.map(({ student, attended, total }) => (
-                      <TableRow key={student.id}>
-                        <TableCell className="font-medium">
-                          {student.name}
-                        </TableCell>
-                        <TableCell>{student.school_class ?? "-"}</TableCell>
-                        <TableCell className="text-center">{attended}</TableCell>
-                        <TableCell className="text-center">{total}</TableCell>
-                        <TableCell className="text-center">
-                          {total > 0
-                            ? `${Math.round((attended / total) * 100)}%`
-                            : "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </TooltipProvider>
   );
 }
 

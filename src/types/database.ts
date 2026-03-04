@@ -144,6 +144,7 @@ export type Database = {
       }
       students: {
         Row: {
+          active: boolean
           created_at: string | null
           fee_exempt: boolean | null
           health_notes: string | null
@@ -155,6 +156,7 @@ export type Database = {
           view_token: string | null
         }
         Insert: {
+          active?: boolean
           created_at?: string | null
           fee_exempt?: boolean | null
           health_notes?: string | null
@@ -166,6 +168,7 @@ export type Database = {
           view_token?: string | null
         }
         Update: {
+          active?: boolean
           created_at?: string | null
           fee_exempt?: boolean | null
           health_notes?: string | null

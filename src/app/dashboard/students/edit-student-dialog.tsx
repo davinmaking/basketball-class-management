@@ -32,6 +32,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
     phone: student.phone ?? "",
     health_notes: student.health_notes ?? "",
     fee_exempt: student.fee_exempt ?? false,
+    active: student.active ?? true,
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,6 +53,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
         phone: form.phone.trim() || null,
         health_notes: form.health_notes.trim() || null,
         fee_exempt: form.fee_exempt,
+        active: form.active,
       })
       .eq("id", student.id);
 
@@ -124,6 +126,16 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
               }
             />
             <Label htmlFor="edit-fee_exempt">免收费用</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="edit-active"
+              checked={form.active}
+              onCheckedChange={(checked) =>
+                setForm({ ...form, active: checked === true })
+              }
+            />
+            <Label htmlFor="edit-active">活跃学生</Label>
           </div>
           <div className="flex justify-end gap-2">
             <Button
