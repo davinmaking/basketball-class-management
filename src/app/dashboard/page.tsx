@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   // Get stats
   const [studentsResult, sessionsResult, attendanceResult, paymentsResult] =
     await Promise.all([
-      supabase.from("students").select("id", { count: "exact", head: true }),
+      supabase.from("students").select("id", { count: "exact", head: true }).eq("active", true),
       supabase
         .from("class_sessions")
         .select("id", { count: "exact", head: true })
@@ -38,7 +38,8 @@ export default async function DashboardPage() {
         .from("payments")
         .select("amount")
         .eq("month", currentMonth)
-        .eq("year", currentYear),
+        .eq("year", currentYear)
+        .eq("voided", false),
     ]);
 
   const totalStudents = studentsResult.count ?? 0;
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
       title: "学生总数",
       value: totalStudents,
       icon: Users,
-      description: "全部学生",
+      description: "活跃学生",
     },
     {
       title: "本月训练课",
