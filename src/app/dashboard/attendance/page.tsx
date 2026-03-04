@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
-import { ms } from "date-fns/locale";
+import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 
@@ -31,8 +31,8 @@ type Session = Tables<"class_sessions">;
 type Student = Tables<"students">;
 
 const MONTHS = [
-  "Januari", "Februari", "Mac", "April", "Mei", "Jun",
-  "Julai", "Ogos", "September", "Oktober", "November", "Disember",
+  "一月", "二月", "三月", "四月", "五月", "六月",
+  "七月", "八月", "九月", "十月", "十一月", "十二月",
 ];
 
 export default function AttendancePage() {
@@ -144,12 +144,12 @@ export default function AttendancePage() {
       .upsert(records, { onConflict: "student_id,session_id" });
 
     if (error) {
-      toast.error("Gagal menyimpan kehadiran");
+      toast.error("保存出勤记录失败");
       setSaving(false);
       return;
     }
 
-    toast.success("Kehadiran berjaya disimpan");
+    toast.success("出勤记录已保存");
     setSaving(false);
   }
 
@@ -163,7 +163,7 @@ export default function AttendancePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Kehadiran</h1>
+      <h1 className="text-2xl font-bold mb-6">出勤</h1>
 
       <div className="flex gap-3 mb-6">
         <Select
@@ -207,34 +207,34 @@ export default function AttendancePage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="take">Ambil Kehadiran</TabsTrigger>
-          <TabsTrigger value="summary">Ringkasan Bulanan</TabsTrigger>
+          <TabsTrigger value="take">记录出勤</TabsTrigger>
+          <TabsTrigger value="summary">月度汇总</TabsTrigger>
         </TabsList>
 
         <TabsContent value="take" className="mt-4">
           {loading ? (
-            <p className="text-muted-foreground">Memuatkan...</p>
+            <p className="text-muted-foreground">加载中...</p>
           ) : sessions.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                Tiada sesi latihan untuk bulan ini. Tambah sesi dahulu.
+                本月没有训练课。请先添加训练课。
               </CardContent>
             </Card>
           ) : (
             <>
               <div className="mb-4">
                 <Label className="text-sm font-medium mb-2 block">
-                  Pilih Sesi Latihan
+                  选择训练课
                 </Label>
                 <Select value={selectedSession} onValueChange={setSelectedSession}>
                   <SelectTrigger className="w-[300px]">
-                    <SelectValue placeholder="Pilih tarikh..." />
+                    <SelectValue placeholder="选择日期..." />
                   </SelectTrigger>
                   <SelectContent>
                     {sessions.map((session) => (
                       <SelectItem key={session.id} value={session.id}>
                         {format(parseISO(session.session_date), "d MMMM yyyy (EEEE)", {
-                          locale: ms,
+                          locale: zhCN,
                         })}
                       </SelectItem>
                     ))}
@@ -246,11 +246,11 @@ export default function AttendancePage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-base">
-                      Hadir: {presentCount} / {students.length}
+                      出勤: {presentCount} / {students.length}
                     </CardTitle>
                     <Button onClick={saveAttendance} disabled={saving} size="sm">
                       <Save className="h-4 w-4 mr-2" />
-                      {saving ? "Menyimpan..." : "Simpan"}
+                      {saving ? "保存中..." : "保存"}
                     </Button>
                   </CardHeader>
                   <CardContent>
@@ -260,14 +260,14 @@ export default function AttendancePage() {
                         size="sm"
                         onClick={() => toggleAll(true)}
                       >
-                        Pilih Semua
+                        全选
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => toggleAll(false)}
                       >
-                        Nyahpilih Semua
+                        取消全选
                       </Button>
                     </div>
 
@@ -304,21 +304,21 @@ export default function AttendancePage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Ringkasan {MONTHS[selectedMonth]} {selectedYear}
+                {selectedYear}年{MONTHS[selectedMonth]}汇总
               </CardTitle>
             </CardHeader>
             <CardContent>
               {summaryData.length === 0 ? (
-                <p className="text-muted-foreground">Tiada data kehadiran</p>
+                <p className="text-muted-foreground">暂无出勤数据</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Pelajar</TableHead>
-                      <TableHead>Kelas</TableHead>
-                      <TableHead className="text-center">Hadir</TableHead>
-                      <TableHead className="text-center">Jumlah Sesi</TableHead>
-                      <TableHead className="text-center">Kadar (%)</TableHead>
+                      <TableHead>学生</TableHead>
+                      <TableHead>班级</TableHead>
+                      <TableHead className="text-center">出勤</TableHead>
+                      <TableHead className="text-center">总课次</TableHead>
+                      <TableHead className="text-center">出勤率 (%)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

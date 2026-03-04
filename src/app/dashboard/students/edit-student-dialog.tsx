@@ -37,7 +37,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast.error("Nama pelajar diperlukan");
+      toast.error("请输入学生姓名");
       return;
     }
 
@@ -56,12 +56,12 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
       .eq("id", student.id);
 
     if (error) {
-      toast.error("Gagal mengemaskini pelajar");
+      toast.error("更新学生信息失败");
       setLoading(false);
       return;
     }
 
-    toast.success("Maklumat pelajar dikemaskini");
+    toast.success("学生信息已更新");
     setLoading(false);
     onOpenChange(false);
     onSuccess();
@@ -71,11 +71,11 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Pelajar</DialogTitle>
+          <DialogTitle>编辑学生</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="edit-name">Nama Pelajar *</Label>
+            <Label htmlFor="edit-name">学生姓名 *</Label>
             <Input
               id="edit-name"
               value={form.name}
@@ -84,7 +84,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit-school_class">Kelas</Label>
+            <Label htmlFor="edit-school_class">班级</Label>
             <Input
               id="edit-school_class"
               value={form.school_class}
@@ -92,7 +92,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit-parent_name">Nama Ibu Bapa / Penjaga</Label>
+            <Label htmlFor="edit-parent_name">家长/监护人姓名</Label>
             <Input
               id="edit-parent_name"
               value={form.parent_name}
@@ -100,7 +100,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit-phone">No. Telefon</Label>
+            <Label htmlFor="edit-phone">电话号码</Label>
             <Input
               id="edit-phone"
               value={form.phone}
@@ -108,7 +108,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit-health_notes">Nota Kesihatan</Label>
+            <Label htmlFor="edit-health_notes">健康备注</Label>
             <Textarea
               id="edit-health_notes"
               value={form.health_notes}
@@ -123,7 +123,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
                 setForm({ ...form, fee_exempt: checked === true })
               }
             />
-            <Label htmlFor="edit-fee_exempt">Dikecualikan yuran</Label>
+            <Label htmlFor="edit-fee_exempt">免收费用</Label>
           </div>
           <div className="flex justify-end gap-2">
             <Button
@@ -131,10 +131,10 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Batal
+              取消
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Mengemaskini..." : "Kemaskini"}
+              {loading ? "更新中..." : "更新"}
             </Button>
           </div>
         </form>

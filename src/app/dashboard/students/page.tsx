@@ -38,7 +38,7 @@ export default function StudentsPage() {
       .select("*")
       .order("name");
     if (error) {
-      toast.error("Gagal memuatkan senarai pelajar");
+      toast.error("加载学生列表失败");
       return;
     }
     setStudents(data ?? []);
@@ -60,21 +60,21 @@ export default function StudentsPage() {
     if (!token) return;
     const url = `${window.location.origin}/view/${token}`;
     navigator.clipboard.writeText(url);
-    toast.success("Pautan ibu bapa telah disalin");
+    toast.success("家长链接已复制");
   }
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">Pelajar</h1>
+        <h1 className="text-2xl font-bold">学生</h1>
         <div className="flex gap-2">
           <Button onClick={() => setShowCsv(true)} variant="outline" size="sm">
             <Upload className="h-4 w-4 mr-2" />
-            Import CSV
+            导入CSV
           </Button>
           <Button onClick={() => setShowAdd(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Tambah Pelajar
+            添加学生
           </Button>
         </div>
       </div>
@@ -82,7 +82,7 @@ export default function StudentsPage() {
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Cari nama, kelas, atau ibu bapa..."
+          placeholder="搜索姓名、班级或家长..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
@@ -93,25 +93,25 @@ export default function StudentsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nama</TableHead>
-              <TableHead>Kelas</TableHead>
-              <TableHead>Ibu Bapa</TableHead>
-              <TableHead>Telefon</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Tindakan</TableHead>
+              <TableHead>姓名</TableHead>
+              <TableHead>班级</TableHead>
+              <TableHead>家长</TableHead>
+              <TableHead>电话</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Memuatkan...
+                  加载中...
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  {search ? "Tiada pelajar ditemui" : "Belum ada pelajar. Tambah pelajar pertama!"}
+                  {search ? "未找到学生" : "还没有学生。添加第一个学生吧！"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -123,11 +123,11 @@ export default function StudentsPage() {
                   <TableCell>{student.phone ?? "-"}</TableCell>
                   <TableCell>
                     {student.fee_exempt && (
-                      <Badge variant="secondary">Dikecualikan Yuran</Badge>
+                      <Badge variant="secondary">免费</Badge>
                     )}
                     {student.health_notes && (
                       <Badge variant="outline" className="ml-1">
-                        Nota Kesihatan
+                        健康备注
                       </Badge>
                     )}
                   </TableCell>
@@ -136,7 +136,7 @@ export default function StudentsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Salin pautan ibu bapa"
+                        title="复制家长链接"
                         onClick={() => copyViewLink(student.view_token)}
                       >
                         <Link2 className="h-4 w-4" />
@@ -159,7 +159,7 @@ export default function StudentsPage() {
       </div>
 
       <div className="mt-2 text-sm text-muted-foreground">
-        {filtered.length} pelajar {search && `(ditapis dari ${students.length})`}
+        {filtered.length} 名学生 {search && `（从 ${students.length} 名中筛选）`}
       </div>
 
       <AddStudentDialog

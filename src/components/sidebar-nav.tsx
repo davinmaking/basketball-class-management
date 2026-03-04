@@ -20,12 +20,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/students", label: "Pelajar", icon: Users },
-  { href: "/dashboard/sessions", label: "Sesi Latihan", icon: Calendar },
-  { href: "/dashboard/attendance", label: "Kehadiran", icon: ClipboardCheck },
-  { href: "/dashboard/fees", label: "Yuran", icon: DollarSign },
-  { href: "/dashboard/receipts", label: "Resit", icon: Receipt },
+  { href: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
+  { href: "/dashboard/students", label: "学生", icon: Users },
+  { href: "/dashboard/sessions", label: "训练课", icon: Calendar },
+  { href: "/dashboard/attendance", label: "出勤", icon: ClipboardCheck },
+  { href: "/dashboard/fees", label: "费用", icon: DollarSign },
+  { href: "/dashboard/receipts", label: "收据", icon: Receipt },
 ];
 
 export function SidebarNav() {
@@ -43,7 +43,7 @@ export function SidebarNav() {
     <>
       {/* Mobile header */}
       <div className="md:hidden flex items-center justify-between p-4 border-b bg-background sticky top-0 z-50">
-        <h1 className="font-bold text-lg">Basketball Manager</h1>
+        <h1 className="font-bold text-lg">篮球训练班管理</h1>
         <Button
           variant="ghost"
           size="icon"
@@ -69,8 +69,8 @@ export function SidebarNav() {
         )}
       >
         <div className="p-6 border-b hidden md:block">
-          <h1 className="font-bold text-lg">Basketball Manager</h1>
-          <p className="text-sm text-muted-foreground">Pengurusan Kelas Latihan</p>
+          <h1 className="font-bold text-lg">篮球训练班管理</h1>
+          <p className="text-sm text-muted-foreground">训练班管理系统</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
@@ -105,7 +105,7 @@ export function SidebarNav() {
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4" />
-            Log Keluar
+            退出登录
           </Button>
         </div>
       </aside>

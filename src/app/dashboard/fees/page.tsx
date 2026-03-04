@@ -37,8 +37,8 @@ import { useRouter } from "next/navigation";
 const FEE_PER_SESSION = 5; // RM5
 
 const MONTHS = [
-  "Januari", "Februari", "Mac", "April", "Mei", "Jun",
-  "Julai", "Ogos", "September", "Oktober", "November", "Disember",
+  "一月", "二月", "三月", "四月", "五月", "六月",
+  "七月", "八月", "九月", "十月", "十一月", "十二月",
 ];
 
 type Student = Tables<"students">;
@@ -143,7 +143,7 @@ export default function FeesPage() {
     if (!paymentStudent || !paymentAmount) return;
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast.error("Sila masukkan jumlah yang sah");
+      toast.error("请输入有效金额");
       return;
     }
 
@@ -165,7 +165,7 @@ export default function FeesPage() {
       .single();
 
     if (paymentError) {
-      toast.error("Gagal merekod pembayaran");
+      toast.error("记录付款失败");
       setSavingPayment(false);
       return;
     }
@@ -192,7 +192,7 @@ export default function FeesPage() {
     });
 
     toast.success(
-      `Pembayaran RM${amount.toFixed(2)} direkod. Resit: ${receiptNumber}`
+      `已记录付款 RM${amount.toFixed(2)}。收据: ${receiptNumber}`
     );
     setSavingPayment(false);
     setShowPayment(false);
@@ -205,7 +205,7 @@ export default function FeesPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Yuran</h1>
+      <h1 className="text-2xl font-bold mb-6">费用</h1>
 
       <div className="flex gap-3 mb-6">
         <Select
@@ -243,7 +243,7 @@ export default function FeesPage() {
       <div className="grid gap-4 md:grid-cols-3 mb-6">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Jumlah Patut Bayar</CardTitle>
+            <CardTitle className="text-sm font-medium">应缴总额</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">RM {totalDue.toFixed(2)}</div>
@@ -251,7 +251,7 @@ export default function FeesPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Jumlah Diterima</CardTitle>
+            <CardTitle className="text-sm font-medium">已收总额</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">RM {totalPaid.toFixed(2)}</div>
@@ -259,14 +259,14 @@ export default function FeesPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Baki</CardTitle>
+            <CardTitle className="text-sm font-medium">余额</CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalBalance >= 0 ? "text-green-600" : "text-destructive"}`}>
               RM {totalBalance.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {totalBalance > 0 ? "Lebihan" : totalBalance < 0 ? "Belum bayar" : "Seimbang"}
+              {totalBalance > 0 ? "多缴" : totalBalance < 0 ? "未缴" : "已结清"}
             </p>
           </CardContent>
         </Card>
@@ -277,25 +277,25 @@ export default function FeesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Pelajar</TableHead>
-                <TableHead className="text-center">Sesi Hadir</TableHead>
-                <TableHead className="text-right">Patut Bayar</TableHead>
-                <TableHead className="text-right">Telah Bayar</TableHead>
-                <TableHead className="text-right">Baki</TableHead>
-                <TableHead className="text-right">Tindakan</TableHead>
+                <TableHead>学生</TableHead>
+                <TableHead className="text-center">出勤课次</TableHead>
+                <TableHead className="text-right">应缴</TableHead>
+                <TableHead className="text-right">已缴</TableHead>
+                <TableHead className="text-right">余额</TableHead>
+                <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Memuatkan...
+                    加载中...
                   </TableCell>
                 </TableRow>
               ) : feeData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Tiada data
+                    暂无数据
                   </TableCell>
                 </TableRow>
               ) : (
@@ -305,7 +305,7 @@ export default function FeesPage() {
                       <span className="font-medium">{row.student.name}</span>
                       {row.student.fee_exempt && (
                         <Badge variant="secondary" className="ml-2">
-                          Dikecualikan
+                          免费
                         </Badge>
                       )}
                     </TableCell>
@@ -344,7 +344,7 @@ export default function FeesPage() {
                           }
                         >
                           <DollarSign className="h-4 w-4 mr-1" />
-                          Bayar
+                          付款
                         </Button>
                       )}
                     </TableCell>
@@ -357,7 +357,7 @@ export default function FeesPage() {
       </Card>
 
       <p className="text-sm text-muted-foreground mt-2">
-        Kadar: RM{FEE_PER_SESSION} / sesi
+        费率: RM{FEE_PER_SESSION} / 课
       </p>
 
       {/* Payment dialog */}
@@ -365,12 +365,12 @@ export default function FeesPage() {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>
-              Rekod Pembayaran — {paymentStudent?.name}
+              记录付款 — {paymentStudent?.name}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="pay-amount">Jumlah (RM)</Label>
+              <Label htmlFor="pay-amount">金额 (RM)</Label>
               <Input
                 id="pay-amount"
                 type="number"
@@ -381,7 +381,7 @@ export default function FeesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="pay-date">Tarikh Bayar</Label>
+              <Label htmlFor="pay-date">付款日期</Label>
               <Input
                 id="pay-date"
                 type="date"
@@ -390,20 +390,20 @@ export default function FeesPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="pay-notes">Nota</Label>
+              <Label htmlFor="pay-notes">备注</Label>
               <Textarea
                 id="pay-notes"
-                placeholder="cth: Bayar tunai, bayar untuk 2 bulan, dll"
+                placeholder="例如: 现金支付, 预付2个月等"
                 value={paymentNotes}
                 onChange={(e) => setPaymentNotes(e.target.value)}
               />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowPayment(false)}>
-                Batal
+                取消
               </Button>
               <Button onClick={handleRecordPayment} disabled={savingPayment}>
-                {savingPayment ? "Menyimpan..." : "Rekod Pembayaran"}
+                {savingPayment ? "保存中..." : "记录付款"}
               </Button>
             </div>
           </div>

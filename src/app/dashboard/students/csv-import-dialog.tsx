@@ -36,12 +36,12 @@ interface Props {
 }
 
 const FIELD_OPTIONS = [
-  { value: "skip", label: "-- Langkau --" },
-  { value: "name", label: "Nama Pelajar" },
-  { value: "school_class", label: "Kelas" },
-  { value: "parent_name", label: "Nama Ibu Bapa" },
-  { value: "phone", label: "No. Telefon" },
-  { value: "health_notes", label: "Nota Kesihatan" },
+  { value: "skip", label: "-- 跳过 --" },
+  { value: "name", label: "学生姓名" },
+  { value: "school_class", label: "班级" },
+  { value: "parent_name", label: "家长姓名" },
+  { value: "phone", label: "电话号码" },
+  { value: "health_notes", label: "健康备注" },
 ];
 
 type FieldKey = "name" | "school_class" | "parent_name" | "phone" | "health_notes";
@@ -70,7 +70,7 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
       complete: (result) => {
         const data = result.data as string[][];
         if (data.length < 2) {
-          toast.error("CSV tiada data");
+          toast.error("CSV没有数据");
           return;
         }
         setHeaders(data[0]);
@@ -96,7 +96,7 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
         setStep("mapping");
       },
       error: () => {
-        toast.error("Gagal membaca fail CSV");
+        toast.error("读取CSV文件失败");
       },
     });
   }
@@ -122,7 +122,7 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
   async function handleImport() {
     const students = getMappedData();
     if (students.length === 0) {
-      toast.error("Tiada data untuk diimport");
+      toast.error("没有数据可导入");
       return;
     }
 
@@ -140,12 +140,12 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
     const { error } = await supabase.from("students").insert(insertData);
 
     if (error) {
-      toast.error("Gagal mengimport pelajar");
+      toast.error("导入学生失败");
       setLoading(false);
       return;
     }
 
-    toast.success(`${students.length} pelajar berjaya diimport`);
+    toast.success(`成功导入 ${students.length} 名学生`);
     reset();
     onOpenChange(false);
     onSuccess();
@@ -161,9 +161,9 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
     >
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import CSV</DialogTitle>
+          <DialogTitle>导入CSV</DialogTitle>
           <DialogDescription>
-            Muat naik fail CSV dari Google Forms untuk menambah pelajar secara pukal.
+            上传Google Forms导出的CSV文件来批量添加学生。
           </DialogDescription>
         </DialogHeader>
 
@@ -178,10 +178,10 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
                 className="hidden"
               />
               <p className="text-muted-foreground mb-4">
-                Pilih fail CSV yang dieksport dari Google Sheets
+                选择从Google Sheets导出的CSV文件
               </p>
               <Button onClick={() => fileRef.current?.click()}>
-                Pilih Fail CSV
+                选择CSV文件
               </Button>
             </div>
           </div>
@@ -190,7 +190,7 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
         {step === "mapping" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Padankan lajur CSV dengan medan pelajar. Lajur yang tidak diperlukan boleh dilangkau.
+              将CSV列匹配到学生字段。不需要的列可以跳过。
             </p>
 
             <div className="space-y-3">
@@ -222,19 +222,19 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
 
             {!hasNameMapping() && (
               <p className="text-sm text-destructive">
-                Sila padankan sekurang-kurangnya satu lajur ke &quot;Nama Pelajar&quot;
+                请至少将一列匹配到&quot;学生姓名&quot;
               </p>
             )}
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setStep("upload")}>
-                Kembali
+                返回
               </Button>
               <Button
                 disabled={!hasNameMapping()}
                 onClick={() => setStep("preview")}
               >
-                Pratonton ({getMappedData().length} pelajar)
+                预览（{getMappedData().length} 名学生）
               </Button>
             </div>
           </div>
@@ -243,17 +243,17 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
         {step === "preview" && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Pratonton {getMappedData().length} pelajar yang akan diimport:
+              预览将导入的 {getMappedData().length} 名学生：
             </p>
 
             <div className="border rounded-lg max-h-[300px] overflow-y-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Kelas</TableHead>
-                    <TableHead>Ibu Bapa</TableHead>
-                    <TableHead>Telefon</TableHead>
+                    <TableHead>姓名</TableHead>
+                    <TableHead>班级</TableHead>
+                    <TableHead>家长</TableHead>
+                    <TableHead>电话</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -271,10 +271,10 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setStep("mapping")}>
-                Kembali
+                返回
               </Button>
               <Button onClick={handleImport} disabled={loading}>
-                {loading ? "Mengimport..." : `Import ${getMappedData().length} Pelajar`}
+                {loading ? "导入中..." : `导入 ${getMappedData().length} 名学生`}
               </Button>
             </div>
           </div>

@@ -35,7 +35,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) {
-      toast.error("Nama pelajar diperlukan");
+      toast.error("请输入学生姓名");
       return;
     }
 
@@ -51,12 +51,12 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
     });
 
     if (error) {
-      toast.error("Gagal menambah pelajar");
+      toast.error("添加学生失败");
       setLoading(false);
       return;
     }
 
-    toast.success(`${form.name} berjaya ditambah`);
+    toast.success(`${form.name} 已添加`);
     setForm({
       name: "",
       school_class: "",
@@ -74,11 +74,11 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Tambah Pelajar Baru</DialogTitle>
+          <DialogTitle>添加新学生</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nama Pelajar *</Label>
+            <Label htmlFor="name">学生姓名 *</Label>
             <Input
               id="name"
               value={form.name}
@@ -87,16 +87,16 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="school_class">Kelas</Label>
+            <Label htmlFor="school_class">班级</Label>
             <Input
               id="school_class"
-              placeholder="cth: 4A"
+              placeholder="例：4A"
               value={form.school_class}
               onChange={(e) => setForm({ ...form, school_class: e.target.value })}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="parent_name">Nama Ibu Bapa / Penjaga</Label>
+            <Label htmlFor="parent_name">家长/监护人姓名</Label>
             <Input
               id="parent_name"
               value={form.parent_name}
@@ -104,19 +104,19 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phone">No. Telefon</Label>
+            <Label htmlFor="phone">电话号码</Label>
             <Input
               id="phone"
-              placeholder="cth: 012-3456789"
+              placeholder="例：012-3456789"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="health_notes">Nota Kesihatan</Label>
+            <Label htmlFor="health_notes">健康备注</Label>
             <Textarea
               id="health_notes"
-              placeholder="Sebarang keadaan kesihatan yang perlu diketahui"
+              placeholder="需要了解的健康状况"
               value={form.health_notes}
               onChange={(e) => setForm({ ...form, health_notes: e.target.value })}
             />
@@ -129,7 +129,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
                 setForm({ ...form, fee_exempt: checked === true })
               }
             />
-            <Label htmlFor="fee_exempt">Dikecualikan yuran</Label>
+            <Label htmlFor="fee_exempt">免收费用</Label>
           </div>
           <div className="flex justify-end gap-2">
             <Button
@@ -137,10 +137,10 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Batal
+              取消
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Menambah..." : "Tambah"}
+              {loading ? "添加中..." : "添加"}
             </Button>
           </div>
         </form>

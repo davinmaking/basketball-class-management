@@ -11,14 +11,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format, parseISO } from "date-fns";
-import { ms } from "date-fns/locale";
 import { ParentReceiptButton } from "./receipt-button";
 
 const FEE_PER_SESSION = 5;
 
 const MONTHS = [
-  "Januari", "Februari", "Mac", "April", "Mei", "Jun",
-  "Julai", "Ogos", "September", "Oktober", "November", "Disember",
+  "一月", "二月", "三月", "四月", "五月", "六月",
+  "七月", "八月", "九月", "十月", "十一月", "十二月",
 ];
 
 export default async function ParentViewPage({
@@ -116,8 +115,8 @@ export default async function ParentViewPage({
     <div className="min-h-screen bg-muted/30 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold">Kelas Latihan Bola Keranjang</h1>
-          <p className="text-muted-foreground">Portal Ibu Bapa</p>
+          <h1 className="text-2xl font-bold">篮球训练班</h1>
+          <p className="text-muted-foreground">家长门户</p>
         </div>
 
         {/* Student Info */}
@@ -126,14 +125,14 @@ export default async function ParentViewPage({
             <CardTitle className="flex items-center justify-between">
               {student.name}
               {student.fee_exempt && (
-                <Badge variant="secondary">Dikecualikan Yuran</Badge>
+                <Badge variant="secondary">免费</Badge>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
             {student.school_class && (
               <p>
-                <span className="text-muted-foreground">Kelas:</span>{" "}
+                <span className="text-muted-foreground">班级:</span>{" "}
                 {student.school_class}
               </p>
             )}
@@ -144,7 +143,7 @@ export default async function ParentViewPage({
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Jumlah Yuran {currentYear}</CardTitle>
+              <CardTitle className="text-sm">{currentYear}年总费用</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">RM {totalDue.toFixed(2)}</div>
@@ -152,7 +151,7 @@ export default async function ParentViewPage({
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Jumlah Dibayar</CardTitle>
+              <CardTitle className="text-sm">已支付</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">RM {totalPaid.toFixed(2)}</div>
@@ -160,7 +159,7 @@ export default async function ParentViewPage({
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Baki</CardTitle>
+              <CardTitle className="text-sm">余额</CardTitle>
             </CardHeader>
             <CardContent>
               <div
@@ -177,17 +176,17 @@ export default async function ParentViewPage({
         {/* Monthly Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle>Ringkasan Bulanan {currentYear}</CardTitle>
+            <CardTitle>{currentYear}年月度汇总</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Bulan</TableHead>
-                  <TableHead className="text-center">Hadir</TableHead>
-                  <TableHead className="text-right">Yuran</TableHead>
-                  <TableHead className="text-right">Dibayar</TableHead>
-                  <TableHead className="text-right">Baki</TableHead>
+                  <TableHead>月份</TableHead>
+                  <TableHead className="text-center">出勤</TableHead>
+                  <TableHead className="text-right">费用</TableHead>
+                  <TableHead className="text-right">已支付</TableHead>
+                  <TableHead className="text-right">余额</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -197,7 +196,7 @@ export default async function ParentViewPage({
                       colSpan={5}
                       className="text-center py-8 text-muted-foreground"
                     >
-                      Tiada data untuk tahun ini
+                      本年暂无数据
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -238,16 +237,16 @@ export default async function ParentViewPage({
         {(payments ?? []).length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Sejarah Pembayaran</CardTitle>
+              <CardTitle>付款记录</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tarikh</TableHead>
-                    <TableHead>Tempoh</TableHead>
-                    <TableHead className="text-right">Jumlah</TableHead>
-                    <TableHead className="text-right">Resit</TableHead>
+                    <TableHead>日期</TableHead>
+                    <TableHead>期间</TableHead>
+                    <TableHead className="text-right">金额</TableHead>
+                    <TableHead className="text-right">收据</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -287,7 +286,7 @@ export default async function ParentViewPage({
         )}
 
         <p className="text-center text-sm text-muted-foreground">
-          Kadar yuran: RM{FEE_PER_SESSION} / sesi latihan
+          费率: RM{FEE_PER_SESSION} / 课
         </p>
       </div>
     </div>

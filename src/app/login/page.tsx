@@ -37,7 +37,7 @@ export default function LoginPage() {
         return;
       }
 
-      setMessage("Akaun berjaya dicipta! Sila semak email untuk pengesahan, atau log masuk terus.");
+      setMessage("账号创建成功！请查看邮箱进行验证，或直接登录。");
       setIsSignUp(false);
       setLoading(false);
       return;
@@ -61,17 +61,17 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Basketball Manager</CardTitle>
+          <CardTitle className="text-2xl">篮球训练班管理</CardTitle>
           <CardDescription>
             {isSignUp
-              ? "Daftar akaun jurulatih baru"
-              : "Log masuk untuk mengurus kelas latihan"}
+              ? "注册新教练账号"
+              : "登录以管理训练班"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">邮箱</Label>
               <Input
                 id="email"
                 type="email"
@@ -82,11 +82,11 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Kata Laluan</Label>
+              <Label htmlFor="password">密码</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder={isSignUp ? "Minimum 6 aksara" : ""}
+                placeholder={isSignUp ? "至少6个字符" : ""}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -98,11 +98,11 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading
                 ? isSignUp
-                  ? "Mendaftar..."
-                  : "Sedang log masuk..."
+                  ? "注册中..."
+                  : "登录中..."
                 : isSignUp
-                ? "Daftar"
-                : "Log Masuk"}
+                ? "注册"
+                : "登录"}
             </Button>
           </form>
           <div className="mt-4 text-center">
@@ -116,8 +116,8 @@ export default function LoginPage() {
               }}
             >
               {isSignUp
-                ? "Sudah ada akaun? Log masuk"
-                : "Belum ada akaun? Daftar sekarang"}
+                ? "已有账号？登录"
+                : "还没有账号？立即注册"}
             </button>
           </div>
         </CardContent>

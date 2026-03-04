@@ -30,8 +30,8 @@ interface ReceiptRow {
 }
 
 const MONTHS = [
-  "Jan", "Feb", "Mac", "Apr", "Mei", "Jun",
-  "Jul", "Ogo", "Sep", "Okt", "Nov", "Dis",
+  "1月", "2月", "3月", "4月", "5月", "6月",
+  "7月", "8月", "9月", "10月", "11月", "12月",
 ];
 
 export default function ReceiptsPage() {
@@ -62,7 +62,7 @@ export default function ReceiptsPage() {
       .order("issued_at", { ascending: false });
 
     if (error) {
-      toast.error("Gagal memuatkan resit");
+      toast.error("加载收据失败");
       setLoading(false);
       return;
     }
@@ -98,7 +98,7 @@ export default function ReceiptsPage() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Resit ${receipt.receipt_number}</title>
+        <title>收据 ${receipt.receipt_number}</title>
         <style>
           body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
           .header { text-align: center; margin-bottom: 30px; }
@@ -114,20 +114,20 @@ export default function ReceiptsPage() {
       </head>
       <body>
         <div class="header">
-          <h1>RESIT PEMBAYARAN</h1>
-          <p>Kelas Latihan Bola Keranjang</p>
+          <h1>付款收据</h1>
+          <p>篮球训练班</p>
         </div>
         <div class="divider"></div>
-        <div class="row"><span class="label">No. Resit:</span><span>${receipt.receipt_number}</span></div>
-        <div class="row"><span class="label">Tarikh:</span><span>${format(parseISO(receipt.issued_at), "dd/MM/yyyy")}</span></div>
-        <div class="row"><span class="label">Pelajar:</span><span>${receipt.student_name}</span></div>
-        <div class="row"><span class="label">Tempoh:</span><span>${MONTHS[receipt.month - 1]} ${receipt.year}</span></div>
-        ${receipt.notes ? `<div class="row"><span class="label">Nota:</span><span>${receipt.notes}</span></div>` : ""}
+        <div class="row"><span class="label">收据号:</span><span>${receipt.receipt_number}</span></div>
+        <div class="row"><span class="label">日期:</span><span>${format(parseISO(receipt.issued_at), "dd/MM/yyyy")}</span></div>
+        <div class="row"><span class="label">学生:</span><span>${receipt.student_name}</span></div>
+        <div class="row"><span class="label">期间:</span><span>${MONTHS[receipt.month - 1]} ${receipt.year}</span></div>
+        ${receipt.notes ? `<div class="row"><span class="label">备注:</span><span>${receipt.notes}</span></div>` : ""}
         <div class="divider"></div>
         <div class="total">RM ${Number(receipt.amount).toFixed(2)}</div>
         <div class="divider"></div>
         <div class="footer">
-          <p>Terima kasih atas pembayaran anda.</p>
+          <p>感谢您的付款。</p>
         </div>
         <script>window.print();</script>
       </body>
@@ -142,12 +142,12 @@ export default function ReceiptsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Resit</h1>
+      <h1 className="text-2xl font-bold mb-6">收据</h1>
 
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Cari resit atau nama pelajar..."
+          placeholder="搜索收据号或学生姓名..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
@@ -159,25 +159,25 @@ export default function ReceiptsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>No. Resit</TableHead>
-                <TableHead>Pelajar</TableHead>
-                <TableHead>Tempoh</TableHead>
-                <TableHead className="text-right">Jumlah</TableHead>
-                <TableHead>Tarikh</TableHead>
-                <TableHead className="text-right">Tindakan</TableHead>
+                <TableHead>收据号</TableHead>
+                <TableHead>学生</TableHead>
+                <TableHead>期间</TableHead>
+                <TableHead className="text-right">金额</TableHead>
+                <TableHead>日期</TableHead>
+                <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Memuatkan...
+                    加载中...
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    {search ? "Tiada resit ditemui" : "Belum ada resit"}
+                    {search ? "未找到收据" : "暂无收据"}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -203,7 +203,7 @@ export default function ReceiptsPage() {
                         onClick={() => printReceipt(receipt)}
                       >
                         <Printer className="h-4 w-4 mr-1" />
-                        Cetak
+                        打印
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -215,7 +215,7 @@ export default function ReceiptsPage() {
       </Card>
 
       <p className="text-sm text-muted-foreground mt-2">
-        {filtered.length} resit
+        {filtered.length} 张收据
       </p>
     </div>
   );

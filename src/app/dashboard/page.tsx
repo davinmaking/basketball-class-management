@@ -49,34 +49,34 @@ export default async function DashboardPage() {
 
   const stats = [
     {
-      title: "Jumlah Pelajar",
+      title: "学生总数",
       value: totalStudents,
       icon: Users,
-      description: "Jumlah keseluruhan",
+      description: "全部学生",
     },
     {
-      title: "Sesi Bulan Ini",
+      title: "本月训练课",
       value: monthSessions,
       icon: Calendar,
-      description: `Bulan ${currentMonth}/${currentYear}`,
+      description: `${currentYear}年${currentMonth}月`,
     },
     {
-      title: "Kehadiran Bulan Ini",
+      title: "本月出勤",
       value: monthAttendances,
       icon: ClipboardCheck,
-      description: "Jumlah kehadiran",
+      description: "总出勤次数",
     },
     {
-      title: "Kutipan Bulan Ini",
+      title: "本月收款",
       value: `RM ${monthPayments.toFixed(2)}`,
       icon: DollarSign,
-      description: `Bulan ${currentMonth}/${currentYear}`,
+      description: `${currentYear}年${currentMonth}月`,
     },
   ];
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-2xl font-bold mb-6">仪表盘</h1>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.title}>

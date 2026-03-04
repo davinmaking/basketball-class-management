@@ -28,12 +28,12 @@ import { toast } from "sonner";
 type Session = Tables<"class_sessions">;
 
 const MONTHS = [
-  "Januari", "Februari", "Mac", "April", "Mei", "Jun",
-  "Julai", "Ogos", "September", "Oktober", "November", "Disember",
+  "一月", "二月", "三月", "四月", "五月", "六月",
+  "七月", "八月", "九月", "十月", "十一月", "十二月",
 ];
 
 const DAYS_OF_WEEK = [
-  "Ahad", "Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu",
+  "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
 ];
 
 export default function SessionsPage() {
@@ -63,7 +63,7 @@ export default function SessionsPage() {
       .order("session_date");
 
     if (error) {
-      toast.error("Gagal memuatkan sesi");
+      toast.error("加载训练课失败");
       return;
     }
     setSessions(data ?? []);
@@ -82,14 +82,14 @@ export default function SessionsPage() {
 
     if (error) {
       if (error.code === "23505") {
-        toast.error("Tarikh ini sudah ada");
+        toast.error("该日期已存在");
       } else {
-        toast.error("Gagal menambah sesi");
+        toast.error("添加训练课失败");
       }
       return;
     }
 
-    toast.success("Sesi berjaya ditambah");
+    toast.success("训练课已添加");
     setNewDate("");
     setShowAdd(false);
     fetchSessions();
@@ -107,7 +107,7 @@ export default function SessionsPage() {
     }));
 
     if (dates.length === 0) {
-      toast.error("Tiada hari yang sepadan");
+      toast.error("没有匹配的日期");
       return;
     }
 
@@ -116,11 +116,11 @@ export default function SessionsPage() {
       .upsert(dates, { onConflict: "session_date" });
 
     if (error) {
-      toast.error("Gagal menambah sesi");
+      toast.error("添加训练课失败");
       return;
     }
 
-    toast.success(`${dates.length} sesi berjaya ditambah`);
+    toast.success(`成功添加 ${dates.length} 节训练课`);
     setShowBulk(false);
     fetchSessions();
   }
@@ -132,26 +132,26 @@ export default function SessionsPage() {
       .eq("id", id);
 
     if (error) {
-      toast.error("Gagal memadam sesi");
+      toast.error("删除训练课失败");
       return;
     }
 
-    toast.success("Sesi dipadam");
+    toast.success("训练课已删除");
     fetchSessions();
   }
 
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">Sesi Latihan</h1>
+        <h1 className="text-2xl font-bold">训练课</h1>
         <div className="flex gap-2">
           <Button onClick={() => setShowBulk(true)} variant="outline" size="sm">
             <CalendarPlus className="h-4 w-4 mr-2" />
-            Tambah Pukal
+            批量添加
           </Button>
           <Button onClick={() => setShowAdd(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Tambah Tarikh
+            添加日期
           </Button>
         </div>
       </div>
@@ -193,15 +193,15 @@ export default function SessionsPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {MONTHS[selectedMonth]} {selectedYear} — {sessions.length} sesi
+            {MONTHS[selectedMonth]} {selectedYear} — {sessions.length} 节课
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground">Memuatkan...</p>
+            <p className="text-muted-foreground">加载中...</p>
           ) : sessions.length === 0 ? (
             <p className="text-muted-foreground">
-              Tiada sesi untuk bulan ini. Tambah tarikh latihan!
+              本月没有训练课。添加训练日期吧！
             </p>
           ) : (
             <div className="space-y-2">
@@ -241,11 +241,11 @@ export default function SessionsPage() {
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Tambah Tarikh Latihan</DialogTitle>
+            <DialogTitle>添加训练日期</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Tarikh</Label>
+              <Label>日期</Label>
               <Input
                 type="date"
                 value={newDate}
@@ -254,10 +254,10 @@ export default function SessionsPage() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAdd(false)}>
-                Batal
+                取消
               </Button>
               <Button onClick={addSession} disabled={!newDate}>
-                Tambah
+                添加
               </Button>
             </div>
           </div>
@@ -268,15 +268,14 @@ export default function SessionsPage() {
       <Dialog open={showBulk} onOpenChange={setShowBulk}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Tambah Sesi Pukal</DialogTitle>
+            <DialogTitle>批量添加训练课</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Tambah semua hari tertentu dalam {MONTHS[selectedMonth]}{" "}
-              {selectedYear}
+              添加 {selectedYear} 年{MONTHS[selectedMonth]}的所有指定星期
             </p>
             <div className="space-y-2">
-              <Label>Hari</Label>
+              <Label>星期</Label>
               <Select value={bulkDay} onValueChange={setBulkDay}>
                 <SelectTrigger>
                   <SelectValue />
@@ -292,9 +291,9 @@ export default function SessionsPage() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowBulk(false)}>
-                Batal
+                取消
               </Button>
-              <Button onClick={bulkAddSessions}>Tambah</Button>
+              <Button onClick={bulkAddSessions}>添加</Button>
             </div>
           </div>
         </DialogContent>

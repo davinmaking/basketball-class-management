@@ -5,8 +5,8 @@ import { Printer } from "lucide-react";
 import { format, parseISO } from "date-fns";
 
 const MONTHS = [
-  "Jan", "Feb", "Mac", "Apr", "Mei", "Jun",
-  "Jul", "Ogo", "Sep", "Okt", "Nov", "Dis",
+  "1月", "2月", "3月", "4月", "5月", "6月",
+  "7月", "8月", "9月", "10月", "11月", "12月",
 ];
 
 interface Props {
@@ -33,7 +33,7 @@ export function ParentReceiptButton({
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Resit ${receiptNumber}</title>
+        <title>收据 ${receiptNumber}</title>
         <style>
           body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
           .header { text-align: center; margin-bottom: 30px; }
@@ -49,20 +49,20 @@ export function ParentReceiptButton({
       </head>
       <body>
         <div class="header">
-          <h1>RESIT PEMBAYARAN</h1>
-          <p>Kelas Latihan Bola Keranjang</p>
+          <h1>付款收据</h1>
+          <p>篮球训练班</p>
         </div>
         <div class="divider"></div>
-        <div class="row"><span class="label">No. Resit:</span><span>${receiptNumber}</span></div>
-        <div class="row"><span class="label">Tarikh:</span><span>${issuedAt ? format(parseISO(issuedAt), "dd/MM/yyyy") : "-"}</span></div>
-        <div class="row"><span class="label">Pelajar:</span><span>${studentName}</span></div>
-        <div class="row"><span class="label">Tempoh:</span><span>${MONTHS[month - 1]} ${year}</span></div>
-        ${notes ? `<div class="row"><span class="label">Nota:</span><span>${notes}</span></div>` : ""}
+        <div class="row"><span class="label">收据号:</span><span>${receiptNumber}</span></div>
+        <div class="row"><span class="label">日期:</span><span>${issuedAt ? format(parseISO(issuedAt), "dd/MM/yyyy") : "-"}</span></div>
+        <div class="row"><span class="label">学生:</span><span>${studentName}</span></div>
+        <div class="row"><span class="label">期间:</span><span>${MONTHS[month - 1]} ${year}</span></div>
+        ${notes ? `<div class="row"><span class="label">备注:</span><span>${notes}</span></div>` : ""}
         <div class="divider"></div>
         <div class="total">RM ${amount.toFixed(2)}</div>
         <div class="divider"></div>
         <div class="footer">
-          <p>Terima kasih atas pembayaran anda.</p>
+          <p>感谢您的付款。</p>
         </div>
         <script>window.print();</script>
       </body>
