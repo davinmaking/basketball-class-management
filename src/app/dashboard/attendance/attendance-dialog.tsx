@@ -12,6 +12,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -37,6 +44,7 @@ type Session = Tables<"class_sessions"> & {
   coach?: { name: string } | null;
 };
 type Student = Tables<"students">;
+type Coach = Tables<"coaches">;
 
 interface AttendanceDialogProps {
   open: boolean;
@@ -44,6 +52,7 @@ interface AttendanceDialogProps {
   session: Session | null;
   sessionDate: string; // "yyyy-MM-dd"
   students: Student[];
+  coaches: Coach[];
   coachName?: string | null;
   onSaved: () => void;
   onDeleted: () => void;
@@ -55,6 +64,7 @@ export function AttendanceDialog({
   session,
   sessionDate,
   students,
+  coaches,
   coachName,
   onSaved,
   onDeleted,
@@ -65,6 +75,7 @@ export function AttendanceDialog({
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteBlocked, setDeleteBlocked] = useState(false);
+  const [selectedCoachId, setSelectedCoachId] = useState<string>("");
 
   const supabase = createClient();
 
@@ -79,6 +90,29 @@ export function AttendanceDialog({
     [activeStudents]
   );
 
+  // Initialize coach selection when dialog opens
+  useEffect(() => {
+    if (open && session) {
+      setSelectedCoachId(session.coach_id ?? "none");
+    }
+  }, [open, session]);
+
+  async function handleCoachChange(coachId: string) {
+    if (!session) return;
+    setSelectedCoachId(coachId);
+    const newCoachId = coachId === "none" ? null : coachId;
+    const { error } = await supabase
+      .from("class_sessions")
+      .update({ coach_id: newCoachId })
+      .eq("id", session.id);
+    if (error) {
+      toast.error("更换教练失败");
+      return;
+    }
+    toast.success("教练已更换");
+    onSaved(); // refresh parent data
+  }
+
   // Load existing attendance when dialog opens
   useEffect(() => {
     if (!open || !session) {
@@ -86,6 +120,7 @@ export function AttendanceDialog({
         setAttendance({});
         setFeeExempt({});
         setDeleteBlocked(false);
+        setSelectedCoachId("");
       }
       return;
     }
@@ -205,7 +240,7 @@ export function AttendanceDialog({
   // Format the dialog title
   const dateObj = parseISO(sessionDate);
   const dayOfWeek = DAYS_OF_WEEK[getDay(dateObj)];
-  const titleText = `${sessionDate}（${dayOfWeek}）${coachName ? ` · ${coachName}` : ""}`;
+  const titleText = `${sessionDate}（${dayOfWeek}）`;
 
   return (
     <>
@@ -223,6 +258,26 @@ export function AttendanceDialog({
               删除课程
             </Button>
           </DialogHeader>
+
+          {/* Coach selector */}
+          {coaches.length > 0 && (
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <span className="text-sm text-muted-foreground shrink-0">教练:</span>
+              <Select value={selectedCoachId} onValueChange={handleCoachChange}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="未指定" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">未指定</SelectItem>
+                  {coaches.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {loadingAttendance ? (
             <div className="py-8 text-center text-muted-foreground">

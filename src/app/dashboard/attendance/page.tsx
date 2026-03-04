@@ -549,6 +549,7 @@ export default function AttendancePage() {
         session={dialogSession}
         sessionDate={dialogDate}
         students={students}
+        coaches={coaches}
         coachName={dialogSession?.coach?.name}
         onSaved={() => fetchData()}
         onDeleted={() => fetchData()}
