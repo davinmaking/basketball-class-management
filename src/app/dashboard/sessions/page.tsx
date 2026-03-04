@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Tables } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -20,9 +19,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, CalendarPlus } from "lucide-react";
-import { format, parseISO, getDay, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
-import { zhCN } from "date-fns/locale";
+import { ChevronLeft, ChevronRight, Plus, CalendarPlus } from "lucide-react";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  getDay,
+  subDays,
+  addDays,
+  isSameMonth,
+  isToday,
+} from "date-fns";
 import { toast } from "sonner";
 import { MONTHS } from "@/lib/constants";
 
@@ -32,6 +40,8 @@ const DAYS_OF_WEEK = [
   "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
 ];
 
+const CAL_HEADERS = ["一", "二", "三", "四", "五", "六", "日"];
+
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +50,7 @@ export default function SessionsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
   const [newDate, setNewDate] = useState("");
-  const [bulkDay, setBulkDay] = useState("6"); // Saturday default
+  const [bulkDay, setBulkDay] = useState("6");
 
   const supabase = createClient();
 
@@ -70,6 +80,99 @@ export default function SessionsPage() {
     fetchSessions();
   }, [fetchSessions]);
 
+  // Session lookup maps
+  const sessionMap = useMemo(
+    () => new Map(sessions.map((s) => [s.session_date, s])),
+    [sessions]
+  );
+
+  // Calendar grid: 6 weeks starting from Monday
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(new Date(selectedYear, selectedMonth));
+    const monthEnd = endOfMonth(new Date(selectedYear, selectedMonth));
+
+    // getDay: 0=Sun, 1=Mon ... 6=Sat
+    // We want Monday as first column, so offset: Mon=0, Tue=1, ..., Sun=6
+    const startDow = getDay(monthStart);
+    const mondayOffset = startDow === 0 ? 6 : startDow - 1;
+    const gridStart = subDays(monthStart, mondayOffset);
+
+    // Calculate weeks needed: from gridStart to monthEnd
+    const daysFromGridStartToMonthEnd =
+      Math.ceil((monthEnd.getTime() - gridStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const weeksNeeded = Math.ceil(daysFromGridStartToMonthEnd / 7);
+    const totalDays = weeksNeeded * 7;
+
+    const gridEnd = addDays(gridStart, totalDays - 1);
+    return eachDayOfInterval({ start: gridStart, end: gridEnd });
+  }, [selectedMonth, selectedYear]);
+
+  const currentMonthDate = new Date(selectedYear, selectedMonth);
+  const now = new Date();
+  const isCurrentMonth =
+    selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
+
+  // Month navigation
+  function prevMonth() {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear((y) => y - 1);
+    } else {
+      setSelectedMonth((m) => m - 1);
+    }
+  }
+
+  function nextMonth() {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear((y) => y + 1);
+    } else {
+      setSelectedMonth((m) => m + 1);
+    }
+  }
+
+  function goToday() {
+    setSelectedMonth(now.getMonth());
+    setSelectedYear(now.getFullYear());
+  }
+
+  // Toggle session on/off for a date
+  async function toggleSession(date: Date) {
+    const dateStr = format(date, "yyyy-MM-dd");
+    const existing = sessionMap.get(dateStr);
+
+    if (existing) {
+      // Delete
+      const { error } = await supabase
+        .from("class_sessions")
+        .delete()
+        .eq("id", existing.id);
+
+      if (error) {
+        toast.error("删除训练课失败");
+        return;
+      }
+      toast.success("训练课已删除");
+    } else {
+      // Add
+      const { error } = await supabase
+        .from("class_sessions")
+        .insert({ session_date: dateStr });
+
+      if (error) {
+        if (error.code === "23505") {
+          toast.error("该日期已存在");
+        } else {
+          toast.error("添加训练课失败");
+        }
+        return;
+      }
+      toast.success("训练课已添加");
+    }
+    fetchSessions();
+  }
+
+  // Keep existing addSession for the dialog (adding dates in other months)
   async function addSession() {
     if (!newDate) return;
     const { error } = await supabase
@@ -121,23 +224,9 @@ export default function SessionsPage() {
     fetchSessions();
   }
 
-  async function deleteSession(id: string) {
-    const { error } = await supabase
-      .from("class_sessions")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      toast.error("删除训练课失败");
-      return;
-    }
-
-    toast.success("训练课已删除");
-    fetchSessions();
-  }
-
   return (
     <div>
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold">训练课</h1>
         <div className="flex gap-2">
@@ -152,79 +241,82 @@ export default function SessionsPage() {
         </div>
       </div>
 
-      <div className="flex gap-3 mb-6">
-        <Select
-          value={String(selectedMonth)}
-          onValueChange={(v) => setSelectedMonth(Number(v))}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {MONTHS.map((month, idx) => (
-              <SelectItem key={idx} value={String(idx)}>
-                {month}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Input
-          type="number"
-          min={2024}
-          max={2030}
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
-          className="w-[100px]"
-        />
+      {/* Month navigation */}
+      <div className="flex items-center gap-2 mb-4">
+        <Button variant="outline" size="icon" onClick={prevMonth}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="text-lg font-semibold min-w-[140px] text-center">
+          {selectedYear}年{MONTHS[selectedMonth]}
+        </h2>
+        <Button variant="outline" size="icon" onClick={nextMonth}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        {!isCurrentMonth && (
+          <Button variant="ghost" size="sm" onClick={goToday} className="ml-2">
+            今天
+          </Button>
+        )}
+        <span className="text-sm text-muted-foreground ml-auto">
+          本月 {sessions.length} 节课
+        </span>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {MONTHS[selectedMonth]} {selectedYear} — {sessions.length} 节课
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-muted-foreground">加载中...</p>
-          ) : sessions.length === 0 ? (
-            <p className="text-muted-foreground">
-              本月没有训练课。添加训练日期吧！
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {sessions.map((session) => {
-                const date = parseISO(session.session_date);
-                return (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-3 rounded-lg border"
-                  >
-                    <div>
-                      <span className="font-medium">
-                        {format(date, "d MMMM yyyy (EEEE)", { locale: zhCN })}
-                      </span>
-                      {session.notes && (
-                        <span className="text-sm text-muted-foreground ml-2">
-                          — {session.notes}
-                        </span>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deleteSession(session.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                );
-              })}
+      {/* Calendar grid */}
+      <div className="border rounded-lg overflow-hidden">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 border-b bg-muted/50">
+          {CAL_HEADERS.map((d) => (
+            <div
+              key={d}
+              className="py-2 text-center text-sm font-medium text-muted-foreground"
+            >
+              {d}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        {loading ? (
+          <div className="py-16 text-center text-muted-foreground">
+            加载中...
+          </div>
+        ) : (
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const inMonth = isSameMonth(day, currentMonthDate);
+              const today = isToday(day);
+              const hasSession = sessionMap.has(dateStr);
+
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => inMonth && toggleSession(day)}
+                  disabled={!inMonth}
+                  className={`
+                    relative aspect-square flex items-center justify-center
+                    text-sm border-b border-r transition-colors
+                    ${!inMonth
+                      ? "text-muted-foreground/25 cursor-default bg-muted/20"
+                      : hasSession
+                        ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+                        : "hover:bg-muted cursor-pointer"
+                    }
+                    ${today && inMonth ? "ring-2 ring-primary ring-inset" : ""}
+                  `}
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <p className="text-xs text-muted-foreground mt-3">
+        点击日期添加或删除训练课
+      </p>
 
       {/* Add single date dialog */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
@@ -261,7 +353,7 @@ export default function SessionsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              添加 {selectedYear} 年{MONTHS[selectedMonth]}的所有指定星期
+              添加 {selectedYear}年{MONTHS[selectedMonth]}的所有指定星期
             </p>
             <div className="space-y-2">
               <Label>星期</Label>
