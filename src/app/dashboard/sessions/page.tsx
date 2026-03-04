@@ -21,16 +21,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus, Trash2, CalendarPlus } from "lucide-react";
-import { format, parseISO, getDay, addDays, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { format, parseISO, getDay, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
+import { MONTHS } from "@/lib/constants";
 
 type Session = Tables<"class_sessions">;
-
-const MONTHS = [
-  "一月", "二月", "三月", "四月", "五月", "六月",
-  "七月", "八月", "九月", "十月", "十一月", "十二月",
-];
 
 const DAYS_OF_WEEK = [
   "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
@@ -173,21 +169,14 @@ export default function SessionsPage() {
           </SelectContent>
         </Select>
 
-        <Select
-          value={String(selectedYear)}
-          onValueChange={(v) => setSelectedYear(Number(v))}
-        >
-          <SelectTrigger className="w-[100px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[2025, 2026, 2027].map((year) => (
-              <SelectItem key={year} value={String(year)}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Input
+          type="number"
+          min={2024}
+          max={2030}
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          className="w-[100px]"
+        />
       </div>
 
       <Card>

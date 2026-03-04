@@ -3,11 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
 import { format, parseISO } from "date-fns";
-
-const MONTHS = [
-  "1月", "2月", "3月", "4月", "5月", "6月",
-  "7月", "8月", "9月", "10月", "11月", "12月",
-];
+import { MONTHS } from "@/lib/constants";
 
 interface Props {
   receiptNumber: string;

@@ -30,17 +30,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, MessageCircle } from "lucide-react";
+import { DollarSign, MessageCircle, History } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { formatPhoneForWhatsApp } from "@/lib/phone";
-
-const FEE_PER_SESSION = 5; // RM5
-
-const MONTHS = [
-  "一月", "二月", "三月", "四月", "五月", "六月",
-  "七月", "八月", "九月", "十月", "十一月", "十二月",
-];
+import { MONTHS, FEE_PER_SESSION } from "@/lib/constants";
 
 type Student = Tables<"students">;
 
@@ -86,8 +80,17 @@ export default function FeesPage() {
   );
   const [savingPayment, setSavingPayment] = useState(false);
 
+  // History + void dialog state
+  const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
+  const [historyPayments, setHistoryPayments] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showVoid, setShowVoid] = useState(false);
+  const [voidPaymentId, setVoidPaymentId] = useState<string>("");
+  const [voidReason, setVoidReason] = useState("");
+  const [voidingPayment, setVoidingPayment] = useState(false);
+
   const supabase = createClient();
-  const router = useRouter();
 
   const fetchFees = useCallback(async () => {
     setLoading(true);
@@ -109,20 +112,22 @@ export default function FeesPage() {
         .from("payments")
         .select("student_id, amount")
         .eq("month", month)
-        .eq("year", selectedYear),
+        .eq("year", selectedYear)
+        .eq("voided", false),
     ]);
 
     const students = studentsRes.data ?? [];
     const sessionIds = (sessionsRes.data ?? []).map((s) => s.id);
 
-    // Get attendance for this month's sessions
+    // Get attendance for this month's sessions (only count chargeable: present AND NOT fee_exempt)
     let attendanceCounts: Record<string, number> = {};
     if (sessionIds.length > 0) {
       const { data: attendanceData } = await supabase
         .from("attendance")
         .select("student_id")
         .in("session_id", sessionIds)
-        .eq("present", true);
+        .eq("present", true)
+        .eq("fee_exempt", false);
 
       (attendanceData ?? []).forEach((a) => {
         attendanceCounts[a.student_id] = (attendanceCounts[a.student_id] ?? 0) + 1;
@@ -139,7 +144,7 @@ export default function FeesPage() {
       .filter((s) => s.active !== false)
       .map((student) => {
         const sessionsAttended = attendanceCounts[student.id] ?? 0;
-        const amountDue = student.fee_exempt ? 0 : sessionsAttended * FEE_PER_SESSION;
+        const amountDue = sessionsAttended * FEE_PER_SESSION;
         const totalPaid = paymentSums[student.id] ?? 0;
         const balance = totalPaid - amountDue;
 
@@ -222,6 +227,67 @@ export default function FeesPage() {
     fetchFees();
   }
 
+  async function openHistory(student: Student) {
+    setHistoryStudent(student);
+    setShowHistory(true);
+    setLoadingHistory(true);
+
+    const month = selectedMonth + 1;
+    const { data } = await supabase
+      .from("payments")
+      .select("*, receipts(receipt_number, voided)")
+      .eq("student_id", student.id)
+      .eq("month", month)
+      .eq("year", selectedYear)
+      .order("payment_date", { ascending: false });
+
+    setHistoryPayments(data ?? []);
+    setLoadingHistory(false);
+  }
+
+  function openVoidDialog(paymentId: string) {
+    setVoidPaymentId(paymentId);
+    setVoidReason("");
+    setShowVoid(true);
+  }
+
+  async function handleVoidPayment() {
+    if (!voidPaymentId) return;
+    setVoidingPayment(true);
+
+    // Void the payment
+    const { error: payError } = await supabase
+      .from("payments")
+      .update({
+        voided: true,
+        voided_at: new Date().toISOString(),
+        voided_reason: voidReason.trim() || null,
+      })
+      .eq("id", voidPaymentId);
+
+    if (payError) {
+      toast.error("撤回付款失败");
+      setVoidingPayment(false);
+      return;
+    }
+
+    // Void linked receipt
+    await supabase
+      .from("receipts")
+      .update({ voided: true })
+      .eq("payment_id", voidPaymentId);
+
+    toast.success("付款已撤回");
+    setVoidingPayment(false);
+    setShowVoid(false);
+
+    // Refresh history if open
+    if (historyStudent) {
+      openHistory(historyStudent);
+    }
+    fetchFees();
+  }
+
   const totalDue = feeData.reduce((s, r) => s + r.amountDue, 0);
   const totalPaid = feeData.reduce((s, r) => s + r.totalPaid, 0);
   const totalBalance = totalPaid - totalDue;
@@ -246,21 +312,14 @@ export default function FeesPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select
-          value={String(selectedYear)}
-          onValueChange={(v) => setSelectedYear(Number(v))}
-        >
-          <SelectTrigger className="w-[100px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[2025, 2026, 2027].map((year) => (
-              <SelectItem key={year} value={String(year)}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Input
+          type="number"
+          min={2024}
+          max={2030}
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          className="w-[100px]"
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 mb-6">
@@ -326,11 +385,6 @@ export default function FeesPage() {
                   <TableRow key={row.student.id}>
                     <TableCell>
                       <span className="font-medium">{row.student.name}</span>
-                      {row.student.fee_exempt && (
-                        <Badge variant="secondary" className="ml-2">
-                          免费
-                        </Badge>
-                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {row.sessionsAttended}
@@ -356,6 +410,14 @@ export default function FeesPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="付款记录"
+                          onClick={() => openHistory(row.student)}
+                        >
+                          <History className="h-4 w-4" />
+                        </Button>
                         {row.balance < 0 && row.student.phone && (
                           <Button
                             variant="ghost"
@@ -377,21 +439,19 @@ export default function FeesPage() {
                             </a>
                           </Button>
                         )}
-                        {!row.student.fee_exempt && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              openPaymentDialog(
-                                row.student,
-                                row.balance < 0 ? Math.abs(row.balance) : 0
-                              )
-                            }
-                          >
-                            <DollarSign className="h-4 w-4 mr-1" />
-                            付款
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            openPaymentDialog(
+                              row.student,
+                              row.balance < 0 ? Math.abs(row.balance) : 0
+                            )
+                          }
+                        >
+                          <DollarSign className="h-4 w-4 mr-1" />
+                          付款
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -405,6 +465,105 @@ export default function FeesPage() {
       <p className="text-sm text-muted-foreground mt-2">
         费率: RM{FEE_PER_SESSION} / 课
       </p>
+
+      {/* Payment history dialog */}
+      <Dialog open={showHistory} onOpenChange={setShowHistory}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              付款记录 — {historyStudent?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {MONTHS[selectedMonth]} {selectedYear}
+          </p>
+          {loadingHistory ? (
+            <p className="text-muted-foreground py-4">加载中...</p>
+          ) : historyPayments.length === 0 ? (
+            <p className="text-muted-foreground py-4">暂无付款记录</p>
+          ) : (
+            <div className="space-y-3">
+              {historyPayments.map((payment: any) => {
+                const receipt = payment.receipts?.[0];
+                return (
+                  <div
+                    key={payment.id}
+                    className={`border rounded-lg p-3 ${
+                      payment.voided ? "opacity-50" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`font-medium ${payment.voided ? "line-through" : ""}`}>
+                        RM {Number(payment.amount).toFixed(2)}
+                      </span>
+                      {payment.voided ? (
+                        <Badge variant="destructive">已撤回</Badge>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-xs text-destructive"
+                          onClick={() => openVoidDialog(payment.id)}
+                        >
+                          撤回
+                        </Button>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {format(parseISO(payment.payment_date), "dd/MM/yyyy")}
+                      {receipt && (
+                        <span className="ml-2">
+                          收据: {receipt.receipt_number}
+                        </span>
+                      )}
+                    </div>
+                    {payment.notes && (
+                      <p className="text-sm mt-1">{payment.notes}</p>
+                    )}
+                    {payment.voided && payment.voided_reason && (
+                      <p className="text-sm text-destructive mt-1">
+                        撤回原因: {payment.voided_reason}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Void payment dialog */}
+      <Dialog open={showVoid} onOpenChange={setShowVoid}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>撤回付款</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="void-reason">撤回原因（可选）</Label>
+              <Textarea
+                id="void-reason"
+                placeholder="例：金额错误, 重复记录等"
+                value={voidReason}
+                onChange={(e) => setVoidReason(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowVoid(false)}>
+                取消
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleVoidPayment}
+                disabled={voidingPayment}
+              >
+                {voidingPayment ? "撤回中..." : "确认撤回"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment dialog */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>

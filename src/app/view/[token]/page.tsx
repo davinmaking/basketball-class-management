@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -10,15 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { ParentReceiptButton } from "./receipt-button";
-
-const FEE_PER_SESSION = 5;
-
-const MONTHS = [
-  "一月", "二月", "三月", "四月", "五月", "六月",
-  "七月", "八月", "九月", "十月", "十一月", "十二月",
-];
+import { MONTHS, FEE_PER_SESSION } from "@/lib/constants";
 
 export default async function ParentViewPage({
   params,
@@ -52,12 +46,19 @@ export default async function ParentViewPage({
   // Get attendance
   const { data: attendanceData } = await supabase
     .from("attendance")
-    .select("session_id, present")
+    .select("session_id, present, fee_exempt")
     .eq("student_id", student.id)
     .eq("present", true);
 
   const attendedSessionIds = new Set(
     (attendanceData ?? []).map((a) => a.session_id)
+  );
+
+  // Sessions that are chargeable (present AND NOT fee_exempt)
+  const chargeableSessionIds = new Set(
+    (attendanceData ?? [])
+      .filter((a) => !a.fee_exempt)
+      .map((a) => a.session_id)
   );
 
   // Get payments
@@ -93,9 +94,13 @@ export default async function ParentViewPage({
       attendedSessionIds.has(s.id)
     ).length;
 
-    const due = student.fee_exempt ? 0 : attended * FEE_PER_SESSION;
+    const chargeable = monthSessions.filter((s) =>
+      chargeableSessionIds.has(s.id)
+    ).length;
+
+    const due = chargeable * FEE_PER_SESSION;
     const paid = (payments ?? [])
-      .filter((p) => p.month === month)
+      .filter((p) => p.month === month && !p.voided)
       .reduce((s, p) => s + Number(p.amount), 0);
 
     return {
@@ -122,18 +127,20 @@ export default async function ParentViewPage({
         {/* Student Info */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              {student.name}
-              {student.fee_exempt && (
-                <Badge variant="secondary">免费</Badge>
-              )}
-            </CardTitle>
+            <CardTitle>{student.name}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm space-y-1">
             {student.school_class && (
               <p>
                 <span className="text-muted-foreground">班级:</span>{" "}
                 {student.school_class}
+              </p>
+            )}
+            {student.parent_name && (
+              <p>
+                <span className="text-muted-foreground">联系人:</span>{" "}
+                {student.parent_name}
+                {student.relationship && ` (${student.relationship})`}
               </p>
             )}
           </CardContent>
@@ -252,19 +259,23 @@ export default async function ParentViewPage({
                 <TableBody>
                   {(payments ?? []).map((payment) => {
                     const receipt = receiptMap.get(payment.id);
+                    const isVoided = payment.voided;
                     return (
-                      <TableRow key={payment.id}>
-                        <TableCell>
+                      <TableRow key={payment.id} className={isVoided ? "opacity-50" : ""}>
+                        <TableCell className={isVoided ? "line-through" : ""}>
                           {format(parseISO(payment.payment_date), "dd/MM/yyyy")}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={isVoided ? "line-through" : ""}>
                           {MONTHS[payment.month - 1]} {payment.year}
+                          {isVoided && (
+                            <Badge variant="destructive" className="ml-2 text-xs">已撤回</Badge>
+                          )}
                         </TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
                           RM {Number(payment.amount).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {receipt && (
+                          {receipt && !isVoided && (
                             <ParentReceiptButton
                               receiptNumber={receipt.receipt_number}
                               issuedAt={receipt.issued_at ?? ""}

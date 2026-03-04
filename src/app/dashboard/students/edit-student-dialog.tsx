@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { format, parseISO } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -29,9 +30,9 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
     name: student.name,
     school_class: student.school_class ?? "",
     parent_name: student.parent_name ?? "",
+    relationship: student.relationship ?? "",
     phone: student.phone ?? "",
     health_notes: student.health_notes ?? "",
-    fee_exempt: student.fee_exempt ?? false,
     active: student.active ?? true,
   });
 
@@ -50,9 +51,9 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
         name: form.name.trim(),
         school_class: form.school_class.trim() || null,
         parent_name: form.parent_name.trim() || null,
+        relationship: form.relationship.trim() || null,
         phone: form.phone.trim() || null,
         health_notes: form.health_notes.trim() || null,
-        fee_exempt: form.fee_exempt,
         active: form.active,
       })
       .eq("id", student.id);
@@ -102,6 +103,15 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="edit-relationship">与学生的关系</Label>
+            <Input
+              id="edit-relationship"
+              placeholder="例：母亲, 父亲, 姑姑"
+              value={form.relationship}
+              onChange={(e) => setForm({ ...form, relationship: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="edit-phone">电话号码</Label>
             <Input
               id="edit-phone"
@@ -117,16 +127,14 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
               onChange={(e) => setForm({ ...form, health_notes: e.target.value })}
             />
           </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="edit-fee_exempt"
-              checked={form.fee_exempt}
-              onCheckedChange={(checked) =>
-                setForm({ ...form, fee_exempt: checked === true })
-              }
-            />
-            <Label htmlFor="edit-fee_exempt">免收费用</Label>
-          </div>
+          {student.registered_at && (
+            <div className="space-y-2">
+              <Label>注册日期</Label>
+              <p className="text-sm text-muted-foreground">
+                {format(parseISO(student.registered_at), "yyyy-MM-dd")}
+              </p>
+            </div>
+          )}
           <div className="flex items-center space-x-2">
             <Checkbox
               id="edit-active"

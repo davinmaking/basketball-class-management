@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Tables } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -32,20 +33,17 @@ import { format, parseISO } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 import { Save, AlertTriangle } from "lucide-react";
+import { MONTHS } from "@/lib/constants";
 
 type Session = Tables<"class_sessions">;
 type Student = Tables<"students">;
-
-const MONTHS = [
-  "一月", "二月", "三月", "四月", "五月", "六月",
-  "七月", "八月", "九月", "十月", "十一月", "十二月",
-];
 
 export default function AttendancePage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedSession, setSelectedSession] = useState<string>("");
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
+  const [feeExempt, setFeeExempt] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -96,13 +94,21 @@ export default function AttendancePage() {
     async function loadAttendance() {
       const { data } = await supabase
         .from("attendance")
-        .select("student_id, present")
+        .select("student_id, present, fee_exempt")
         .eq("session_id", selectedSession);
 
       const map: Record<string, boolean> = {};
-      activeStudents.forEach((s) => (map[s.id] = false));
-      data?.forEach((a) => (map[a.student_id] = a.present ?? false));
+      const exemptMap: Record<string, boolean> = {};
+      activeStudents.forEach((s) => {
+        map[s.id] = false;
+        exemptMap[s.id] = false;
+      });
+      data?.forEach((a) => {
+        map[a.student_id] = a.present ?? false;
+        exemptMap[a.student_id] = a.fee_exempt ?? false;
+      });
       setAttendance(map);
+      setFeeExempt(exemptMap);
     }
 
     loadAttendance();
@@ -148,6 +154,7 @@ export default function AttendancePage() {
       student_id: studentId,
       session_id: selectedSession,
       present,
+      fee_exempt: feeExempt[studentId] ?? false,
     }));
 
     // Upsert all attendance records
@@ -198,24 +205,17 @@ export default function AttendancePage() {
             </SelectContent>
           </Select>
 
-          <Select
-            value={String(selectedYear)}
-            onValueChange={(v) => {
-              setSelectedYear(Number(v));
+          <Input
+            type="number"
+            min={2024}
+            max={2030}
+            value={selectedYear}
+            onChange={(e) => {
+              setSelectedYear(Number(e.target.value));
               setSelectedSession("");
             }}
-          >
-            <SelectTrigger className="w-[100px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[2025, 2026, 2027].map((year) => (
-                <SelectItem key={year} value={String(year)}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            className="w-[100px]"
+          />
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
@@ -299,7 +299,7 @@ export default function AttendancePage() {
                                 })
                               }
                             />
-                            <span className="font-medium">{student.name}</span>
+                            <span className="font-medium flex-1">{student.name}</span>
                             <span className="text-sm text-muted-foreground">
                               {student.school_class}
                             </span>
@@ -315,6 +315,22 @@ export default function AttendancePage() {
                                   <p className="text-sm">{student.health_notes}</p>
                                 </TooltipContent>
                               </Tooltip>
+                            )}
+                            {attendance[student.id] && (
+                              <Button
+                                variant={feeExempt[student.id] ? "default" : "outline"}
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() =>
+                                  setFeeExempt({
+                                    ...feeExempt,
+                                    [student.id]: !feeExempt[student.id],
+                                  })
+                                }
+                                title={feeExempt[student.id] ? "已豁免费用" : "豁免此次费用"}
+                              >
+                                免
+                              </Button>
                             )}
                           </div>
                         ))}

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -27,9 +26,9 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
     name: "",
     school_class: "",
     parent_name: "",
+    relationship: "",
     phone: "",
     health_notes: "",
-    fee_exempt: false,
     active: true,
   });
 
@@ -46,10 +45,11 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
       name: form.name.trim(),
       school_class: form.school_class.trim() || null,
       parent_name: form.parent_name.trim() || null,
+      relationship: form.relationship.trim() || null,
       phone: form.phone.trim() || null,
       health_notes: form.health_notes.trim() || null,
-      fee_exempt: form.fee_exempt,
       active: form.active,
+      registered_at: new Date().toISOString(),
     });
 
     if (error) {
@@ -63,9 +63,9 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
       name: "",
       school_class: "",
       parent_name: "",
+      relationship: "",
       phone: "",
       health_notes: "",
-      fee_exempt: false,
       active: true,
     });
     setLoading(false);
@@ -107,6 +107,15 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
             />
           </div>
           <div className="space-y-2">
+            <Label htmlFor="relationship">与学生的关系</Label>
+            <Input
+              id="relationship"
+              placeholder="例：母亲, 父亲, 姑姑"
+              value={form.relationship}
+              onChange={(e) => setForm({ ...form, relationship: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="phone">电话号码</Label>
             <Input
               id="phone"
@@ -123,16 +132,6 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
               value={form.health_notes}
               onChange={(e) => setForm({ ...form, health_notes: e.target.value })}
             />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="fee_exempt"
-              checked={form.fee_exempt}
-              onCheckedChange={(checked) =>
-                setForm({ ...form, fee_exempt: checked === true })
-              }
-            />
-            <Label htmlFor="fee_exempt">免收费用</Label>
           </div>
           <div className="flex justify-end gap-2">
             <Button

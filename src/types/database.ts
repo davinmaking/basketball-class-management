@@ -15,6 +15,7 @@ export type Database = {
       attendance: {
         Row: {
           created_at: string | null
+          fee_exempt: boolean
           id: string
           present: boolean | null
           session_id: string
@@ -22,6 +23,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          fee_exempt?: boolean
           id?: string
           present?: boolean | null
           session_id: string
@@ -29,6 +31,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          fee_exempt?: boolean
           id?: string
           present?: boolean | null
           session_id?: string
@@ -81,6 +84,9 @@ export type Database = {
           notes: string | null
           payment_date: string
           student_id: string
+          voided: boolean
+          voided_at: string | null
+          voided_reason: string | null
           year: number
         }
         Insert: {
@@ -91,6 +97,9 @@ export type Database = {
           notes?: string | null
           payment_date?: string
           student_id: string
+          voided?: boolean
+          voided_at?: string | null
+          voided_reason?: string | null
           year: number
         }
         Update: {
@@ -101,6 +110,9 @@ export type Database = {
           notes?: string | null
           payment_date?: string
           student_id?: string
+          voided?: boolean
+          voided_at?: string | null
+          voided_reason?: string | null
           year?: number
         }
         Relationships: [
@@ -119,18 +131,21 @@ export type Database = {
           issued_at: string | null
           payment_id: string
           receipt_number: string
+          voided: boolean
         }
         Insert: {
           id?: string
           issued_at?: string | null
           payment_id: string
           receipt_number: string
+          voided?: boolean
         }
         Update: {
           id?: string
           issued_at?: string | null
           payment_id?: string
           receipt_number?: string
+          voided?: boolean
         }
         Relationships: [
           {
@@ -152,6 +167,8 @@ export type Database = {
           name: string
           parent_name: string | null
           phone: string | null
+          registered_at: string | null
+          relationship: string | null
           school_class: string | null
           view_token: string | null
         }
@@ -164,6 +181,8 @@ export type Database = {
           name: string
           parent_name?: string | null
           phone?: string | null
+          registered_at?: string | null
+          relationship?: string | null
           school_class?: string | null
           view_token?: string | null
         }
@@ -176,6 +195,8 @@ export type Database = {
           name?: string
           parent_name?: string | null
           phone?: string | null
+          registered_at?: string | null
+          relationship?: string | null
           school_class?: string | null
           view_token?: string | null
         }

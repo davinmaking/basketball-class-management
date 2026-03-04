@@ -13,9 +13,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Download, Printer } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, Printer } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
+import { MONTHS } from "@/lib/constants";
 
 interface ReceiptRow {
   id: string;
@@ -27,12 +29,9 @@ interface ReceiptRow {
   year: number;
   student_name: string;
   notes: string | null;
+  voided: boolean;
+  payment_voided: boolean;
 }
-
-const MONTHS = [
-  "1月", "2月", "3月", "4月", "5月", "6月",
-  "7月", "8月", "9月", "10月", "11月", "12月",
-];
 
 export default function ReceiptsPage() {
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
@@ -49,12 +48,14 @@ export default function ReceiptsPage() {
         id,
         receipt_number,
         issued_at,
+        voided,
         payment:payments!inner(
           amount,
           payment_date,
           month,
           year,
           notes,
+          voided,
           student:students!inner(name)
         )
       `
@@ -77,6 +78,8 @@ export default function ReceiptsPage() {
       year: r.payment.year,
       student_name: r.payment.student.name,
       notes: r.payment.notes,
+      voided: r.voided ?? false,
+      payment_voided: r.payment.voided ?? false,
     }));
 
     setReceipts(rows);
@@ -181,33 +184,41 @@ export default function ReceiptsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((receipt) => (
-                  <TableRow key={receipt.id}>
-                    <TableCell className="font-mono text-sm">
-                      {receipt.receipt_number}
-                    </TableCell>
-                    <TableCell>{receipt.student_name}</TableCell>
-                    <TableCell>
-                      {MONTHS[receipt.month - 1]} {receipt.year}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      RM {Number(receipt.amount).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      {format(parseISO(receipt.issued_at), "dd/MM/yyyy")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => printReceipt(receipt)}
-                      >
-                        <Printer className="h-4 w-4 mr-1" />
-                        打印
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                filtered.map((receipt) => {
+                  const isVoided = receipt.voided || receipt.payment_voided;
+                  return (
+                    <TableRow key={receipt.id} className={isVoided ? "opacity-50" : ""}>
+                      <TableCell className={`font-mono text-sm ${isVoided ? "line-through" : ""}`}>
+                        {receipt.receipt_number}
+                        {isVoided && (
+                          <Badge variant="destructive" className="ml-2 text-xs">已撤回</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className={isVoided ? "line-through" : ""}>{receipt.student_name}</TableCell>
+                      <TableCell className={isVoided ? "line-through" : ""}>
+                        {MONTHS[receipt.month - 1]} {receipt.year}
+                      </TableCell>
+                      <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
+                        RM {Number(receipt.amount).toFixed(2)}
+                      </TableCell>
+                      <TableCell className={isVoided ? "line-through" : ""}>
+                        {format(parseISO(receipt.issued_at), "dd/MM/yyyy")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!isVoided && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => printReceipt(receipt)}
+                          >
+                            <Printer className="h-4 w-4 mr-1" />
+                            打印
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

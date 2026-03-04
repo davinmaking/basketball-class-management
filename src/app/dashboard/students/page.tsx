@@ -190,14 +190,18 @@ export default function StudentsPage() {
                       )}
                     </TableCell>
                     <TableCell>{student.school_class ?? "-"}</TableCell>
-                    <TableCell>{student.parent_name ?? "-"}</TableCell>
+                    <TableCell>
+                      {student.parent_name ?? "-"}
+                      {student.relationship && (
+                        <span className="text-muted-foreground ml-1">
+                          ({student.relationship})
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{student.phone ?? "-"}</TableCell>
                     <TableCell>
                       {student.active === false && (
                         <Badge variant="destructive" className="mr-1">非活跃</Badge>
-                      )}
-                      {student.fee_exempt && (
-                        <Badge variant="secondary">免费</Badge>
                       )}
                       {student.health_notes && (
                         <Badge variant="outline" className="ml-1">

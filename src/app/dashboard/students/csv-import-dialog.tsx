@@ -40,11 +40,12 @@ const FIELD_OPTIONS = [
   { value: "name", label: "学生姓名" },
   { value: "school_class", label: "班级" },
   { value: "parent_name", label: "家长姓名" },
+  { value: "relationship", label: "关系" },
   { value: "phone", label: "电话号码" },
   { value: "health_notes", label: "健康备注" },
 ];
 
-type FieldKey = "name" | "school_class" | "parent_name" | "phone" | "health_notes";
+type FieldKey = "name" | "school_class" | "parent_name" | "relationship" | "phone" | "health_notes";
 
 export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
   const [step, setStep] = useState<"upload" | "mapping" | "preview">("upload");
@@ -90,6 +91,8 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
             autoMapping[idx] = "phone";
           } else if (h.includes("kesihatan") || h.includes("health") || h.includes("medical")) {
             autoMapping[idx] = "health_notes";
+          } else if (h.includes("关系") || h.includes("hubungan") || h.includes("relationship")) {
+            autoMapping[idx] = "relationship";
           }
         });
         setMapping(autoMapping);
@@ -133,8 +136,10 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
       name: s.name,
       school_class: s.school_class || null,
       parent_name: s.parent_name || null,
+      relationship: s.relationship || null,
       phone: s.phone || null,
       health_notes: s.health_notes || null,
+      registered_at: new Date().toISOString(),
     }));
 
     const { error } = await supabase.from("students").insert(insertData);
