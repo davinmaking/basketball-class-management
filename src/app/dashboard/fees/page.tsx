@@ -30,6 +30,16 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DollarSign, MessageCircle, History, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
@@ -37,6 +47,19 @@ import { formatPhoneForWhatsApp } from "@/lib/phone";
 import { MONTHS, FEE_PER_SESSION } from "@/lib/constants";
 
 type Student = Tables<"students">;
+
+interface HistoryPayment {
+  id: string;
+  amount: number;
+  payment_date: string;
+  month: number;
+  year: number;
+  notes: string | null;
+  voided: boolean;
+  voided_at: string | null;
+  voided_reason: string | null;
+  receipts: { receipt_number: string; voided: boolean }[];
+}
 
 interface FeeRow {
   student: Student;
@@ -55,12 +78,12 @@ function getWhatsAppUrl(
   const phone = formatPhoneForWhatsApp(student.phone);
   if (!phone) return null;
 
-  const monthName = MONTHS[month - 1];
   const message = encodeURIComponent(
-    `您好，这是${student.name}的篮球训练班费用提醒。\n\n` +
-      `${monthName} ${year}年\n` +
-      `未缴金额: RM${amountDue.toFixed(2)}\n\n` +
-      `请尽快缴费，谢谢！`
+    `Assalamualaikum / Salam sejahtera,\n\n` +
+      `Ini adalah peringatan yuran kelas bola keranjang untuk ${student.name}.\n\n` +
+      `Bulan: ${month}/${year}\n` +
+      `Jumlah tertunggak: RM${amountDue.toFixed(2)}\n\n` +
+      `Sila buat pembayaran secepat mungkin. Terima kasih!`
   );
 
   return `https://wa.me/${phone}?text=${message}`;
@@ -82,7 +105,7 @@ export default function FeesPage() {
 
   // History + void dialog state
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
-  const [historyPayments, setHistoryPayments] = useState<any[]>([]);
+  const [historyPayments, setHistoryPayments] = useState<HistoryPayment[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showVoid, setShowVoid] = useState(false);
@@ -90,6 +113,7 @@ export default function FeesPage() {
   const [voidReason, setVoidReason] = useState("");
   const [voidingPayment, setVoidingPayment] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+  const [confirmDeletePaymentId, setConfirmDeletePaymentId] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -208,26 +232,45 @@ export default function FeesPage() {
       return;
     }
 
-    // Auto-generate receipt
-    const { data: lastReceipt } = await supabase
-      .from("receipts")
-      .select("receipt_number")
-      .order("issued_at", { ascending: false })
-      .limit(1)
-      .single();
+    // Auto-generate receipt with retry on conflict
+    let receiptNumber = "";
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const { data: lastReceipt } = await supabase
+        .from("receipts")
+        .select("receipt_number")
+        .like("receipt_number", `RCP-${selectedYear}-%`)
+        .order("receipt_number", { ascending: false })
+        .limit(1)
+        .single();
 
-    let nextNum = 1;
-    if (lastReceipt?.receipt_number) {
-      const parts = lastReceipt.receipt_number.split("-");
-      nextNum = parseInt(parts[parts.length - 1]) + 1;
+      let nextNum = 1;
+      if (lastReceipt?.receipt_number) {
+        const parts = lastReceipt.receipt_number.split("-");
+        nextNum = parseInt(parts[parts.length - 1]) + 1;
+      }
+
+      receiptNumber = `RCP-${selectedYear}-${String(nextNum).padStart(3, "0")}`;
+
+      const { error: receiptError } = await supabase.from("receipts").insert({
+        payment_id: paymentData.id,
+        receipt_number: receiptNumber,
+      });
+
+      if (!receiptError) break;
+
+      // Retry on unique constraint violation (race condition)
+      if (receiptError.code === "23505" && attempt < maxRetries - 1) {
+        continue;
+      }
+
+      // Final attempt failed or non-constraint error
+      toast.error("生成收据失败，但付款已记录");
+      setSavingPayment(false);
+      setShowPayment(false);
+      fetchFees();
+      return;
     }
-
-    const receiptNumber = `RCP-${selectedYear}-${String(nextNum).padStart(3, "0")}`;
-
-    await supabase.from("receipts").insert({
-      payment_id: paymentData.id,
-      receipt_number: receiptNumber,
-    });
 
     toast.success(
       `已记录付款 RM${amount.toFixed(2)}。收据: ${receiptNumber}`
@@ -300,13 +343,19 @@ export default function FeesPage() {
 
   async function handleDeletePayment(paymentId: string) {
     setDeletingPaymentId(paymentId);
+    setConfirmDeletePaymentId(null);
 
     // Delete receipt first (child), then payment (parent)
-    await supabase.from("receipts").delete().eq("payment_id", paymentId);
-    const { error } = await supabase.from("payments").delete().eq("id", paymentId);
+    const { error: receiptErr } = await supabase.from("receipts").delete().eq("payment_id", paymentId);
+    if (receiptErr) {
+      toast.error("删除收据失败");
+      setDeletingPaymentId(null);
+      return;
+    }
 
+    const { error } = await supabase.from("payments").delete().eq("id", paymentId);
     if (error) {
-      toast.error("删除失败");
+      toast.error("删除付款记录失败（收据已删除，请联系管理员）");
       setDeletingPaymentId(null);
       return;
     }
@@ -367,7 +416,10 @@ export default function FeesPage() {
           min={2024}
           max={2030}
           value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          onChange={(e) => {
+            const val = Number(e.target.value);
+            if (val >= 2024 && val <= 2030) setSelectedYear(val);
+          }}
           className="w-[100px]"
         />
       </div>
@@ -405,12 +457,12 @@ export default function FeesPage() {
       </div>
 
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>学生</TableHead>
-                <TableHead className="text-center">出勤课次</TableHead>
+                <TableHead className="text-center">收费课次</TableHead>
                 <TableHead className="text-right">应缴</TableHead>
                 <TableHead className="text-right">已缴</TableHead>
                 <TableHead className="text-right">余额</TableHead>
@@ -468,7 +520,7 @@ export default function FeesPage() {
             <p className="text-muted-foreground py-4">暂无付款记录</p>
           ) : (
             <div className="space-y-3">
-              {historyPayments.map((payment: any) => {
+              {historyPayments.map((payment) => {
                 const receipt = payment.receipts?.[0];
                 return (
                   <div
@@ -490,7 +542,7 @@ export default function FeesPage() {
                             className="h-6 w-6 text-destructive"
                             title="删除"
                             disabled={deletingPaymentId === payment.id}
-                            onClick={() => handleDeletePayment(payment.id)}
+                            onClick={() => setConfirmDeletePaymentId(payment.id)}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
@@ -561,6 +613,30 @@ export default function FeesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog
+        open={!!confirmDeletePaymentId}
+        onOpenChange={(open) => !open && setConfirmDeletePaymentId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要永久删除此撤回的付款记录及其收据吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDeletePaymentId && handleDeletePayment(confirmDeletePaymentId)}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Payment dialog */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>

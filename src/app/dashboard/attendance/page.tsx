@@ -47,16 +47,23 @@ import {
   isSameMonth,
   isToday,
 } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { MONTHS } from "@/lib/constants";
+import { MONTHS, DAYS_OF_WEEK } from "@/lib/constants";
+import { groupStudentsByClass } from "@/lib/student-groups";
 import { AttendanceDialog } from "./attendance-dialog";
 
 type Session = Tables<"class_sessions">;
 type Student = Tables<"students">;
-
-const DAYS_OF_WEEK = [
-  "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
-];
 
 const CAL_HEADERS = ["一", "二", "三", "四", "五", "六", "日"];
 
@@ -94,6 +101,7 @@ export default function AttendancePage() {
   );
 
   const [loading, setLoading] = useState(true);
+  const [confirmCreateDate, setConfirmCreateDate] = useState<Date | null>(null);
 
   const supabase = createClient();
 
@@ -140,26 +148,22 @@ export default function AttendancePage() {
   );
 
   // Grouped students for summary (same grouping as dialog)
-  const groupedStudents = useMemo(() => {
-    const groups = new Map<string, Student[]>();
-    activeStudents.forEach((s) => {
-      const key = s.school_class || "未分班";
-      const group = groups.get(key) ?? [];
-      group.push(s);
-      groups.set(key, group);
-    });
-    const entries = Array.from(groups.entries()).sort((a, b) => {
-      if (a[0] === "未分班") return 1;
-      if (b[0] === "未分班") return -1;
-      return a[0].localeCompare(b[0], "zh");
-    });
-    entries.forEach(([, group]) => {
-      group.sort((a, b) => a.name.localeCompare(b.name, "zh"));
-    });
-    return entries;
-  }, [activeStudents]);
+  const groupedStudents = useMemo(
+    () => groupStudentsByClass(activeStudents),
+    [activeStudents]
+  );
 
   // ── Data fetching ──────────────────────────────────────
+
+  // Students are independent of month - fetch once
+  const fetchStudents = useCallback(async () => {
+    const { data } = await supabase.from("students").select("*").order("name");
+    setStudents(data ?? []);
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
 
   const fetchData = useCallback(async () => {
     const monthStr = String(selectedMonth + 1).padStart(2, "0");
@@ -168,21 +172,16 @@ export default function AttendancePage() {
     const endYear = selectedMonth === 11 ? selectedYear + 1 : selectedYear;
     const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
 
-    const [sessionsRes, studentsRes] = await Promise.all([
-      supabase
-        .from("class_sessions")
-        .select("*")
-        .gte("session_date", startDate)
-        .lt("session_date", endDate)
-        .order("session_date"),
-      supabase.from("students").select("*").order("name"),
-    ]);
+    const sessionsRes = await supabase
+      .from("class_sessions")
+      .select("*")
+      .gte("session_date", startDate)
+      .lt("session_date", endDate)
+      .order("session_date");
 
     const sessionsData = sessionsRes.data ?? [];
-    const studentsData = studentsRes.data ?? [];
 
     setSessions(sessionsData);
-    setStudents(studentsData);
 
     // Fetch attendance for all sessions in this month
     const sessionIds = sessionsData.map((s) => s.id);
@@ -252,32 +251,43 @@ export default function AttendancePage() {
 
   // ── Click date → open attendance dialog ────────────────
 
-  async function handleDateClick(date: Date) {
+  function handleDateClick(date: Date) {
     const dateStr = format(date, "yyyy-MM-dd");
-    let session = sessionMap.get(dateStr) ?? null;
+    const session = sessionMap.get(dateStr) ?? null;
 
     if (!session) {
-      // Auto-create session
-      const { data, error } = await supabase
-        .from("class_sessions")
-        .insert({ session_date: dateStr })
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === "23505") {
-          toast.error("该日期已存在");
-        } else {
-          toast.error("创建训练课失败");
-        }
-        return;
-      }
-      session = data;
-      // Refresh data to show new session on calendar
-      await fetchData();
+      // Confirm before creating a new session
+      setConfirmCreateDate(date);
+      return;
     }
 
     setDialogSession(session);
+    setDialogDate(dateStr);
+    setDialogOpen(true);
+  }
+
+  async function confirmCreateSession() {
+    if (!confirmCreateDate) return;
+    const dateStr = format(confirmCreateDate, "yyyy-MM-dd");
+    setConfirmCreateDate(null);
+
+    const { data, error } = await supabase
+      .from("class_sessions")
+      .insert({ session_date: dateStr })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        toast.error("该日期已存在");
+      } else {
+        toast.error("创建训练课失败");
+      }
+      return;
+    }
+
+    await fetchData();
+    setDialogSession(data);
     setDialogDate(dateStr);
     setDialogOpen(true);
   }
@@ -470,7 +480,7 @@ export default function AttendancePage() {
               {selectedYear}年{MONTHS[selectedMonth]} 月度汇总
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -539,6 +549,27 @@ export default function AttendancePage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm session creation */}
+      <AlertDialog
+        open={!!confirmCreateDate}
+        onOpenChange={(open) => !open && setConfirmCreateDate(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>添加训练课</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmCreateDate && `${format(confirmCreateDate, "yyyy-MM-dd")}（${DAYS_OF_WEEK[getDay(confirmCreateDate)]}）尚未安排训练课。是否创建并记录出勤？`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCreateSession}>
+              创建
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Bulk add dialog */}
       <Dialog open={showBulk} onOpenChange={setShowBulk}>

@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,15 +13,19 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ParentReceiptButton } from "./receipt-button";
-import { MONTHS, FEE_PER_SESSION } from "@/lib/constants";
+import { FEE_PER_SESSION } from "@/lib/constants";
 
 export default async function ParentViewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ year?: string }>;
 }) {
   const { token } = await params;
+  const resolvedSearchParams = await searchParams;
   const supabase = await createClient();
 
   // Find student by token
@@ -33,14 +39,23 @@ export default async function ParentViewPage({
     notFound();
   }
 
-  const currentYear = new Date().getFullYear();
+  const nowYear = new Date().getFullYear();
+  const selectedYear = resolvedSearchParams.year
+    ? parseInt(resolvedSearchParams.year)
+    : nowYear;
 
-  // Get all sessions for current year
+  // Validate year range
+  const displayYear =
+    isNaN(selectedYear) || selectedYear < 2020 || selectedYear > nowYear + 1
+      ? nowYear
+      : selectedYear;
+
+  // Get all sessions for selected year
   const { data: sessions } = await supabase
     .from("class_sessions")
     .select("*")
-    .gte("session_date", `${currentYear}-01-01`)
-    .lt("session_date", `${currentYear + 1}-01-01`)
+    .gte("session_date", `${displayYear}-01-01`)
+    .lt("session_date", `${displayYear + 1}-01-01`)
     .order("session_date");
 
   // Get attendance
@@ -66,7 +81,7 @@ export default async function ParentViewPage({
     .from("payments")
     .select("*")
     .eq("student_id", student.id)
-    .eq("year", currentYear)
+    .eq("year", displayYear)
     .order("payment_date", { ascending: false });
 
   // Get receipts
@@ -146,11 +161,29 @@ export default async function ParentViewPage({
           </CardContent>
         </Card>
 
+        {/* Year Navigation */}
+        <div className="flex items-center justify-center gap-3">
+          <Link href={`/view/${token}?year=${displayYear - 1}`}>
+            <Button variant="ghost" size="sm">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <span className="text-lg font-semibold">{displayYear}年</span>
+          {displayYear < nowYear && (
+            <Link href={`/view/${token}?year=${displayYear + 1}`}>
+              <Button variant="ghost" size="sm">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
+          {displayYear >= nowYear && <div className="w-9" />}
+        </div>
+
         {/* Fee Summary */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{currentYear}年总费用</CardTitle>
+              <CardTitle className="text-sm">{displayYear}年总费用</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">RM {totalDue.toFixed(2)}</div>
@@ -183,9 +216,9 @@ export default async function ParentViewPage({
         {/* Monthly Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle>{currentYear}年月度汇总</CardTitle>
+            <CardTitle>{displayYear}年月度汇总</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -209,7 +242,7 @@ export default async function ParentViewPage({
                 ) : (
                   monthlySummaries.map((m) => (
                     <TableRow key={m.month}>
-                      <TableCell>{MONTHS[m.month - 1]}</TableCell>
+                      <TableCell>{m.month}月</TableCell>
                       <TableCell className="text-center">
                         {m.attended} / {m.totalSessions}
                       </TableCell>
@@ -246,7 +279,7 @@ export default async function ParentViewPage({
             <CardHeader>
               <CardTitle>付款记录</CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -266,7 +299,7 @@ export default async function ParentViewPage({
                           {format(parseISO(payment.payment_date), "dd/MM/yyyy")}
                         </TableCell>
                         <TableCell className={isVoided ? "line-through" : ""}>
-                          {MONTHS[payment.month - 1]} {payment.year}
+                          {payment.year}年{payment.month}月
                           {isVoided && (
                             <Badge variant="destructive" className="ml-2 text-xs">已撤回</Badge>
                           )}

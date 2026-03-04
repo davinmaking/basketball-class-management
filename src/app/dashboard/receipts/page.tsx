@@ -13,17 +13,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Search, Printer, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
-import { MONTHS } from "@/lib/constants";
+import { printReceiptHtml } from "@/lib/receipt-html";
 
 interface ReceiptRow {
   id: string;
   payment_id: string;
   receipt_number: string;
-  issued_at: string;
+  issued_at: string | null;
   amount: number;
   payment_date: string;
   month: number;
@@ -39,6 +49,7 @@ export default function ReceiptsPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteReceipt, setConfirmDeleteReceipt] = useState<ReceiptRow | null>(null);
 
   const supabase = createClient();
 
@@ -101,55 +112,24 @@ export default function ReceiptsPage() {
       r.receipt_number.toLowerCase().includes(search.toLowerCase())
   );
 
-  function printReceipt(receipt: ReceiptRow) {
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>收据 ${receipt.receipt_number}</title>
-        <style>
-          body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .header h1 { font-size: 20px; margin: 0; }
-          .header p { color: #666; font-size: 14px; }
-          .divider { border-top: 1px dashed #ccc; margin: 15px 0; }
-          .row { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
-          .row .label { color: #666; }
-          .total { font-size: 18px; font-weight: bold; margin: 15px 0; text-align: center; }
-          .footer { text-align: center; color: #999; font-size: 12px; margin-top: 30px; }
-          @media print { body { margin: 0; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>付款收据</h1>
-          <p>篮球训练班</p>
-        </div>
-        <div class="divider"></div>
-        <div class="row"><span class="label">收据号:</span><span>${receipt.receipt_number}</span></div>
-        <div class="row"><span class="label">日期:</span><span>${format(parseISO(receipt.issued_at), "dd/MM/yyyy")}</span></div>
-        <div class="row"><span class="label">学生:</span><span>${receipt.student_name}</span></div>
-        <div class="row"><span class="label">期间:</span><span>${receipt.year}年${receipt.month}月</span></div>
-        ${receipt.notes ? `<div class="row"><span class="label">备注:</span><span>${receipt.notes}</span></div>` : ""}
-        <div class="divider"></div>
-        <div class="total">RM ${Number(receipt.amount).toFixed(2)}</div>
-        <div class="divider"></div>
-        <div class="footer">
-          <p>感谢您的付款。</p>
-        </div>
-        <script>window.print();</script>
-      </body>
-      </html>
-    `;
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
+  function handlePrintReceipt(receipt: ReceiptRow) {
+    const success = printReceiptHtml({
+      receiptNumber: receipt.receipt_number,
+      issuedAt: receipt.issued_at,
+      studentName: receipt.student_name,
+      amount: Number(receipt.amount),
+      month: receipt.month,
+      year: receipt.year,
+      notes: receipt.notes,
+    });
+    if (!success) {
+      toast.error("打印窗口被浏览器拦截，请允许弹出窗口后重试");
     }
   }
 
   async function handleDeleteReceipt(receipt: ReceiptRow) {
     setDeletingId(receipt.id);
+    setConfirmDeleteReceipt(null);
 
     // Delete receipt first, then payment
     const { error: rErr } = await supabase
@@ -167,7 +147,7 @@ export default function ReceiptsPage() {
       .delete()
       .eq("id", receipt.payment_id);
     if (pErr) {
-      toast.error("删除付款记录失败");
+      toast.error("删除付款记录失败（收据已删除，请联系管理员）");
       setDeletingId(null);
       return;
     }
@@ -192,7 +172,7 @@ export default function ReceiptsPage() {
       </div>
 
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -236,7 +216,9 @@ export default function ReceiptsPage() {
                         RM {Number(receipt.amount).toFixed(2)}
                       </TableCell>
                       <TableCell className={isVoided ? "line-through" : ""}>
-                        {format(parseISO(receipt.issued_at), "dd/MM/yyyy")}
+                        {receipt.issued_at
+                          ? format(parseISO(receipt.issued_at), "dd/MM/yyyy")
+                          : "-"}
                       </TableCell>
                       <TableCell className="text-right">
                         {isVoided ? (
@@ -246,7 +228,7 @@ export default function ReceiptsPage() {
                             className="text-destructive"
                             title="删除"
                             disabled={deletingId === receipt.id}
-                            onClick={() => handleDeleteReceipt(receipt)}
+                            onClick={() => setConfirmDeleteReceipt(receipt)}
                           >
                             <Trash2 className="h-4 w-4 mr-1" />
                             删除
@@ -255,7 +237,7 @@ export default function ReceiptsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => printReceipt(receipt)}
+                            onClick={() => handlePrintReceipt(receipt)}
                           >
                             <Printer className="h-4 w-4 mr-1" />
                             打印
@@ -274,6 +256,30 @@ export default function ReceiptsPage() {
       <p className="text-sm text-muted-foreground mt-2">
         {filtered.length} 张收据
       </p>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog
+        open={!!confirmDeleteReceipt}
+        onOpenChange={(open) => !open && setConfirmDeleteReceipt(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要永久删除收据 {confirmDeleteReceipt?.receipt_number} 及其关联的付款记录吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => confirmDeleteReceipt && handleDeleteReceipt(confirmDeleteReceipt)}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

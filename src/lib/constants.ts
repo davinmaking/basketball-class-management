@@ -3,4 +3,8 @@ export const MONTHS = [
   "7月", "8月", "9月", "10月", "11月", "12月",
 ];
 
+export const DAYS_OF_WEEK = [
+  "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
+];
+
 export const FEE_PER_SESSION = 5; // RM5

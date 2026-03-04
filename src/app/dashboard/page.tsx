@@ -25,7 +25,7 @@ export default async function DashboardPage() {
         ),
       supabase
         .from("attendance")
-        .select("id, present, session:class_sessions!inner(session_date)")
+        .select("*, session:class_sessions!inner(session_date)", { count: "exact", head: true })
         .eq("present", true)
         .gte("class_sessions.session_date", `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`)
         .lt(
@@ -44,7 +44,7 @@ export default async function DashboardPage() {
 
   const totalStudents = studentsResult.count ?? 0;
   const monthSessions = sessionsResult.count ?? 0;
-  const monthAttendances = attendanceResult.data?.length ?? 0;
+  const monthAttendances = attendanceResult.count ?? 0;
   const monthPayments =
     paymentsResult.data?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
 

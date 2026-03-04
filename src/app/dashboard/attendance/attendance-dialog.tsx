@@ -12,21 +12,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { format, parseISO, getDay } from "date-fns";
+import { parseISO, getDay } from "date-fns";
 import { toast } from "sonner";
 import { Trash2, AlertTriangle } from "lucide-react";
+import { DAYS_OF_WEEK } from "@/lib/constants";
+import { groupStudentsByClass } from "@/lib/student-groups";
 
 type Session = Tables<"class_sessions">;
 type Student = Tables<"students">;
-
-const DAYS_OF_WEEK = [
-  "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
-];
 
 interface AttendanceDialogProps {
   open: boolean;
@@ -51,6 +59,8 @@ export function AttendanceDialog({
   const [feeExempt, setFeeExempt] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteBlocked, setDeleteBlocked] = useState(false);
 
   const supabase = createClient();
 
@@ -59,39 +69,19 @@ export function AttendanceDialog({
     [students]
   );
 
-  // Group students by school_class
-  const groupedStudents = useMemo(() => {
-    const groups = new Map<string, Student[]>();
-
-    activeStudents.forEach((s) => {
-      const key = s.school_class || "未分班";
-      const group = groups.get(key) ?? [];
-      group.push(s);
-      groups.set(key, group);
-    });
-
-    // Sort groups: named classes first (sorted), "未分班" last
-    const entries = Array.from(groups.entries()).sort((a, b) => {
-      if (a[0] === "未分班") return 1;
-      if (b[0] === "未分班") return -1;
-      return a[0].localeCompare(b[0], "zh");
-    });
-
-    // Sort students within each group alphabetically
-    entries.forEach(([, group]) => {
-      group.sort((a, b) => a.name.localeCompare(b.name, "zh"));
-    });
-
-    return entries;
-  }, [activeStudents]);
+  // Group students by school_class using shared utility
+  const groupedStudents = useMemo(
+    () => groupStudentsByClass(activeStudents),
+    [activeStudents]
+  );
 
   // Load existing attendance when dialog opens
   useEffect(() => {
     if (!open || !session) {
-      // Reset state when dialog closes or no session
       if (!open) {
         setAttendance({});
         setFeeExempt({});
+        setDeleteBlocked(false);
       }
       return;
     }
@@ -102,7 +92,8 @@ export function AttendanceDialog({
       const exemptMap: Record<string, boolean> = {};
       activeStudents.forEach((s) => {
         map[s.id] = false;
-        exemptMap[s.id] = false;
+        // Use students.fee_exempt as default (#5)
+        exemptMap[s.id] = s.fee_exempt ?? false;
       });
 
       const { data } = await supabase
@@ -110,10 +101,12 @@ export function AttendanceDialog({
         .select("student_id, present, fee_exempt")
         .eq("session_id", session!.id);
 
-      data?.forEach((a) => {
-        map[a.student_id] = a.present ?? false;
-        exemptMap[a.student_id] = a.fee_exempt ?? false;
-      });
+      if (data && data.length > 0) {
+        data.forEach((a) => {
+          map[a.student_id] = a.present ?? false;
+          exemptMap[a.student_id] = a.fee_exempt ?? false;
+        });
+      }
 
       setAttendance(map);
       setFeeExempt(exemptMap);
@@ -160,8 +153,32 @@ export function AttendanceDialog({
     onOpenChange(false);
   }
 
+  async function handleDeleteClick() {
+    if (!session) return;
+
+    // Guard: check if this session's month has any payments (#3)
+    const sessionDate = parseISO(session.session_date);
+    const month = sessionDate.getMonth() + 1;
+    const year = sessionDate.getFullYear();
+
+    const { count } = await supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("month", month)
+      .eq("year", year)
+      .eq("voided", false);
+
+    if (count && count > 0) {
+      setDeleteBlocked(true);
+      return;
+    }
+
+    setConfirmDelete(true);
+  }
+
   async function deleteSession() {
     if (!session) return;
+    setConfirmDelete(false);
 
     // Delete attendance records first
     await supabase.from("attendance").delete().eq("session_id", session.id);
@@ -187,104 +204,142 @@ export function AttendanceDialog({
   const titleText = `${sessionDate}（${dayOfWeek}）`;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
-        <DialogHeader className="flex flex-row items-center justify-between gap-2">
-          <DialogTitle className="text-base">{titleText}</DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive h-8 px-2"
-            onClick={deleteSession}
-          >
-            <Trash2 className="h-4 w-4 mr-1" />
-            删除课程
-          </Button>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
+          <DialogHeader className="flex flex-row items-center justify-between gap-2">
+            <DialogTitle className="text-base">{titleText}</DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive h-8 px-2"
+              onClick={handleDeleteClick}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              删除课程
+            </Button>
+          </DialogHeader>
 
-        {loadingAttendance ? (
-          <div className="py-8 text-center text-muted-foreground">
-            加载中...
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto space-y-4">
-            {/* Select all */}
-            <div className="flex items-center gap-2 pb-2 border-b">
-              <Checkbox
-                checked={allChecked}
-                onCheckedChange={(checked) => toggleAll(checked === true)}
-              />
-              <span className="text-sm font-medium">全选</span>
+          {loadingAttendance ? (
+            <div className="py-8 text-center text-muted-foreground">
+              加载中...
             </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {/* Select all */}
+              <div className="flex items-center gap-2 pb-2 border-b">
+                <Checkbox
+                  checked={allChecked}
+                  onCheckedChange={(checked) => toggleAll(checked === true)}
+                />
+                <span className="text-sm font-medium">全选</span>
+              </div>
 
-            {/* Student groups */}
-            <TooltipProvider>
-              {groupedStudents.map(([className, group]) => (
-                <div key={className} className="space-y-1">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 py-1 border-b">
-                    {className}（{group.length}人）
-                  </div>
-                  {group.map((student) => (
-                    <div
-                      key={student.id}
-                      className="flex items-center gap-3 px-1 py-1.5 rounded hover:bg-accent"
-                    >
-                      <Checkbox
-                        checked={attendance[student.id] ?? false}
-                        onCheckedChange={(checked) =>
-                          setAttendance({
-                            ...attendance,
-                            [student.id]: checked === true,
-                          })
-                        }
-                      />
-                      <span className="flex-1 text-sm font-medium">
-                        {student.name}
-                      </span>
-                      {student.health_notes && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <AlertTriangle className="h-3.5 w-3.5 text-orange-500 shrink-0" />
-                          </TooltipTrigger>
-                          <TooltipContent side="left" className="max-w-xs">
-                            <p className="text-sm">{student.health_notes}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                      {attendance[student.id] && (
-                        <Button
-                          variant={feeExempt[student.id] ? "default" : "outline"}
-                          size="sm"
-                          className="h-6 px-2 text-xs shrink-0"
-                          onClick={() =>
-                            setFeeExempt({
-                              ...feeExempt,
-                              [student.id]: !feeExempt[student.id],
+              {/* Student groups */}
+              <TooltipProvider>
+                {groupedStudents.map(([className, group]) => (
+                  <div key={className} className="space-y-1">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1 py-1 border-b">
+                      {className}（{group.length}人）
+                    </div>
+                    {group.map((student) => (
+                      <div
+                        key={student.id}
+                        className="flex items-center gap-3 px-1 py-1.5 rounded hover:bg-accent"
+                      >
+                        <Checkbox
+                          checked={attendance[student.id] ?? false}
+                          onCheckedChange={(checked) =>
+                            setAttendance({
+                              ...attendance,
+                              [student.id]: checked === true,
                             })
                           }
-                          title={feeExempt[student.id] ? "已豁免费用" : "豁免此次费用"}
-                        >
-                          免
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </TooltipProvider>
-          </div>
-        )}
+                        />
+                        <span className="flex-1 text-sm font-medium">
+                          {student.name}
+                        </span>
+                        {student.health_notes && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <AlertTriangle className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="max-w-xs">
+                              <p className="text-sm">{student.health_notes}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                        {attendance[student.id] && (
+                          <Button
+                            variant={feeExempt[student.id] ? "default" : "outline"}
+                            size="sm"
+                            className="h-6 px-2 text-xs shrink-0"
+                            onClick={() =>
+                              setFeeExempt({
+                                ...feeExempt,
+                                [student.id]: !feeExempt[student.id],
+                              })
+                            }
+                            title={feeExempt[student.id] ? "已豁免费用" : "豁免此次费用"}
+                          >
+                            免
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </TooltipProvider>
+            </div>
+          )}
 
-        {/* Footer buttons */}
-        <div className="flex justify-end gap-2 pt-2 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
-          </Button>
-          <Button onClick={saveAttendance} disabled={saving || loadingAttendance}>
-            {saving ? "保存中..." : `保存 (${presentCount}/${activeStudents.length})`}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {/* Footer buttons */}
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              取消
+            </Button>
+            <Button onClick={saveAttendance} disabled={saving || loadingAttendance}>
+              {saving ? "保存中..." : `保存 (${presentCount}/${activeStudents.length})`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除训练课</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除 {sessionDate} 的训练课吗？相关出勤记录也会被删除，此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={deleteSession}
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete blocked warning */}
+      <AlertDialog open={deleteBlocked} onOpenChange={setDeleteBlocked}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>无法删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              该月份已有付款记录，删除训练课可能影响费用计算。请先处理相关付款记录后再删除。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>知道了</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

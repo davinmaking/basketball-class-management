@@ -26,6 +26,7 @@ import { CsvImportDialog } from "./csv-import-dialog";
 import { EditStudentDialog } from "./edit-student-dialog";
 import { toast } from "sonner";
 import { normalizePhone } from "@/lib/phone";
+import { groupStudentsByClass } from "@/lib/student-groups";
 
 type Student = Tables<"students">;
 
@@ -64,32 +65,17 @@ export default function StudentsPage() {
         s.name.toLowerCase().includes(search.toLowerCase()) ||
         s.school_class?.toLowerCase().includes(search.toLowerCase()) ||
         s.parent_name?.toLowerCase().includes(search.toLowerCase())
-    )
-    .sort((a, b) => {
-      // Sort by school_class (nulls last), then by name
-      const classA = a.school_class || "\uffff";
-      const classB = b.school_class || "\uffff";
-      const classCompare = classA.localeCompare(classB, "zh");
-      if (classCompare !== 0) return classCompare;
-      return a.name.localeCompare(b.name, "zh");
-    });
+    );
 
-  // Group filtered students by school_class for rendering headers
-  const groupedFiltered = useMemo(() => {
-    const groups: { className: string; students: Student[] }[] = [];
-    let currentClass: string | null = null;
-
-    filtered.forEach((s) => {
-      const cls = s.school_class || "未分班";
-      if (cls !== currentClass) {
-        currentClass = cls;
-        groups.push({ className: cls, students: [] });
-      }
-      groups[groups.length - 1].students.push(s);
-    });
-
-    return groups;
-  }, [filtered]);
+  // Group filtered students by school_class using shared utility
+  const groupedFiltered = useMemo(
+    () =>
+      groupStudentsByClass(filtered).map(([className, studs]) => ({
+        className,
+        students: studs,
+      })),
+    [filtered]
+  );
 
   // Build sibling groups by phone number
   const siblingGroups = useMemo(() => {
@@ -118,7 +104,10 @@ export default function StudentsPage() {
   const inactiveCount = students.filter((s) => s.active === false).length;
 
   function copyViewLink(token: string | null) {
-    if (!token) return;
+    if (!token) {
+      toast.error("该学生没有查看链接，请编辑学生信息生成链接");
+      return;
+    }
     const url = `${window.location.origin}/view/${token}`;
     navigator.clipboard.writeText(url);
     toast.success("家长链接已复制");
@@ -162,7 +151,7 @@ export default function StudentsPage() {
           )}
         </div>
 
-        <div className="border rounded-lg">
+        <div className="border rounded-lg overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
