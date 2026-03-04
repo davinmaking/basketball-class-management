@@ -279,13 +279,13 @@ export default async function ParentViewPage({
                       <TableCell className="text-center">
                         {m.attended} / {m.totalSessions}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         {APP_CONFIG.currency} {m.due.toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         {APP_CONFIG.currency} {m.paid.toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
                         <span
                           className={
                             m.balance > 0
@@ -329,16 +329,16 @@ export default async function ParentViewPage({
                     const isVoided = payment.voided;
                     return (
                       <TableRow key={payment.id} className={isVoided ? "opacity-50" : ""}>
-                        <TableCell className={isVoided ? "line-through" : ""}>
+                        <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                           {format(parseISO(payment.payment_date), "dd/MM/yyyy")}
                         </TableCell>
-                        <TableCell className={isVoided ? "line-through" : ""}>
+                        <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                           {payment.year}年{payment.month}月
                           {isVoided && (
                             <Badge variant="destructive" className="ml-2 text-xs">已撤回</Badge>
                           )}
                         </TableCell>
-                        <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
+                        <TableCell className={`text-right font-medium whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                           {APP_CONFIG.currency} {Number(payment.amount).toFixed(2)}
                         </TableCell>
                         <TableCell className={isVoided ? "line-through" : ""}>
@@ -389,15 +389,15 @@ export default async function ParentViewPage({
                     const creditNote = (refund.credit_notes as any[])?.[0];
                     return (
                       <TableRow key={refund.id}>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           {format(parseISO(refund.refund_date), "dd/MM/yyyy")}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           {refund.month
                             ? `${refund.year}年${refund.month}月`
                             : `${refund.year}年（全年）`}
                         </TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className="text-right font-medium whitespace-nowrap">
                           {APP_CONFIG.currency} {Number(refund.amount).toFixed(2)}
                         </TableCell>
                         <TableCell>

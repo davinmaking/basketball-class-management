@@ -159,7 +159,7 @@ export default function StudentsPage() {
                 <TableHead>班级</TableHead>
                 <TableHead>家长</TableHead>
                 <TableHead>电话</TableHead>
-                <TableHead>状态</TableHead>
+                <TableHead className="text-center">状态</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -281,7 +281,7 @@ function GroupedStudentRows({
             )}
           </TableCell>
           <TableCell>{student.phone ?? "-"}</TableCell>
-          <TableCell>
+          <TableCell className="text-center">
             {student.active === false && (
               <Badge variant="destructive" className="mr-1">非活跃</Badge>
             )}

@@ -186,7 +186,7 @@ export default function CoachesPage() {
             <TableRow>
               <TableHead>姓名</TableHead>
               <TableHead>电话</TableHead>
-              <TableHead>状态</TableHead>
+              <TableHead className="text-center">状态</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -217,7 +217,7 @@ export default function CoachesPage() {
                 >
                   <TableCell className="font-medium">{coach.name}</TableCell>
                   <TableCell>{coach.phone ?? "-"}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                     <Badge
                       variant={coach.active ? "default" : "destructive"}
                       className="cursor-pointer"

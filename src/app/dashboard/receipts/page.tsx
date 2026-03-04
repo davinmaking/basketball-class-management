@@ -363,23 +363,23 @@ export default function ReceiptsPage() {
                       const isVoided = receipt.voided || receipt.payment_voided;
                       return (
                         <TableRow key={receipt.id} className={isVoided ? "opacity-50" : ""}>
-                          <TableCell className={`font-mono text-sm ${isVoided ? "line-through" : ""}`}>
+                          <TableCell className={`font-mono text-sm whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {receipt.receipt_number}
                             {isVoided && (
                               <Badge variant="destructive" className="ml-2 text-xs">已撤回</Badge>
                             )}
                           </TableCell>
                           <TableCell className={isVoided ? "line-through" : ""}>{receipt.student_name}</TableCell>
-                          <TableCell className={isVoided ? "line-through" : ""}>
+                          <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {receipt.year}年{receipt.month}月
                           </TableCell>
-                          <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
+                          <TableCell className={`text-right font-medium whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {APP_CONFIG.currency} {Number(receipt.amount).toFixed(2)}
                           </TableCell>
                           <TableCell className={isVoided ? "line-through" : ""}>
                             {receipt.coach_name ?? "-"}
                           </TableCell>
-                          <TableCell className={isVoided ? "line-through" : ""}>
+                          <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {receipt.issued_at
                               ? format(parseISO(receipt.issued_at), "dd/MM/yyyy")
                               : "-"}
@@ -466,23 +466,23 @@ export default function ReceiptsPage() {
                       const isVoided = cn.voided || cn.refund_voided;
                       return (
                         <TableRow key={cn.id} className={isVoided ? "opacity-50" : ""}>
-                          <TableCell className={`font-mono text-sm ${isVoided ? "line-through" : ""}`}>
+                          <TableCell className={`font-mono text-sm whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {cn.credit_note_number}
                             {isVoided && (
                               <Badge variant="destructive" className="ml-2 text-xs">已撤回</Badge>
                             )}
                           </TableCell>
                           <TableCell className={isVoided ? "line-through" : ""}>{cn.student_name}</TableCell>
-                          <TableCell className={isVoided ? "line-through" : ""}>
+                          <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {cn.month ? `${cn.year}年${cn.month}月` : `${cn.year}年（全年）`}
                           </TableCell>
-                          <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
+                          <TableCell className={`text-right font-medium whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {APP_CONFIG.currency} {Number(cn.amount).toFixed(2)}
                           </TableCell>
                           <TableCell className={isVoided ? "line-through" : ""}>
                             {cn.coach_name ?? "-"}
                           </TableCell>
-                          <TableCell className={isVoided ? "line-through" : ""}>
+                          <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {cn.issued_at
                               ? format(parseISO(cn.issued_at), "dd/MM/yyyy")
                               : "-"}
