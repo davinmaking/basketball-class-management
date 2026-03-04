@@ -8,6 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { format, parseISO } from "date-fns";
 import {
   Dialog,
@@ -34,6 +41,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
     phone: student.phone ?? "",
     health_notes: student.health_notes ?? "",
     active: student.active ?? true,
+    preferred_language: student.preferred_language ?? "ms",
   });
 
   async function handleSubmit(e: React.FormEvent) {
@@ -55,6 +63,7 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
         phone: form.phone.trim() || null,
         health_notes: form.health_notes.trim() || null,
         active: form.active,
+        preferred_language: form.preferred_language,
       })
       .eq("id", student.id);
 
@@ -118,6 +127,21 @@ export function EditStudentDialog({ student, open, onOpenChange, onSuccess }: Pr
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-preferred_language">WhatsApp 语言</Label>
+            <Select
+              value={form.preferred_language}
+              onValueChange={(v) => setForm({ ...form, preferred_language: v })}
+            >
+              <SelectTrigger id="edit-preferred_language">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="zh">中文</SelectItem>
+                <SelectItem value="ms">Bahasa Malaysia</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="edit-health_notes">健康备注</Label>

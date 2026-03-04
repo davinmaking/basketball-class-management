@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { detectLanguage } from "@/lib/language";
 
 interface Props {
   open: boolean;
@@ -30,7 +38,24 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
     phone: "",
     health_notes: "",
     active: true,
+    preferred_language: "ms" as "zh" | "ms",
   });
+  // Track if user has manually changed the language selector
+  const manuallySetRef = useRef(false);
+
+  function handleNameChange(name: string) {
+    const updates: Partial<typeof form> = { name };
+    // Auto-detect language only if user hasn't manually overridden
+    if (!manuallySetRef.current) {
+      updates.preferred_language = detectLanguage(name);
+    }
+    setForm({ ...form, ...updates });
+  }
+
+  function handleLanguageChange(lang: string) {
+    manuallySetRef.current = true;
+    setForm({ ...form, preferred_language: lang as "zh" | "ms" });
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,6 +74,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
       phone: form.phone.trim() || null,
       health_notes: form.health_notes.trim() || null,
       active: form.active,
+      preferred_language: form.preferred_language,
       registered_at: new Date().toISOString(),
     });
 
@@ -67,7 +93,9 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
       phone: "",
       health_notes: "",
       active: true,
+      preferred_language: "ms",
     });
+    manuallySetRef.current = false;
     setLoading(false);
     onOpenChange(false);
     onSuccess();
@@ -85,7 +113,7 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
             <Input
               id="name"
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => handleNameChange(e.target.value)}
               required
             />
           </div>
@@ -123,6 +151,21 @@ export function AddStudentDialog({ open, onOpenChange, onSuccess }: Props) {
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="preferred_language">WhatsApp 语言</Label>
+            <Select
+              value={form.preferred_language}
+              onValueChange={handleLanguageChange}
+            >
+              <SelectTrigger id="preferred_language">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="zh">中文</SelectItem>
+                <SelectItem value="ms">Bahasa Malaysia</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="health_notes">健康备注</Label>

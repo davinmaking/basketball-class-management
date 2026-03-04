@@ -45,6 +45,7 @@ import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { formatPhoneForWhatsApp } from "@/lib/phone";
 import { MONTHS, FEE_PER_SESSION } from "@/lib/constants";
+import { getLanguageLabel } from "@/lib/language";
 
 type Student = Tables<"students">;
 
@@ -78,15 +79,26 @@ function getWhatsAppUrl(
   const phone = formatPhoneForWhatsApp(student.phone);
   if (!phone) return null;
 
-  const message = encodeURIComponent(
-    `Assalamualaikum / Salam sejahtera,\n\n` +
+  const lang = student.preferred_language ?? "ms";
+
+  let text: string;
+  if (lang === "zh") {
+    text =
+      `您好，\n\n` +
+      `这是篮球训练班缴费提醒（${student.name}）。\n\n` +
+      `月份: ${year}年${month}月\n` +
+      `欠缴金额: RM${amountDue.toFixed(2)}\n\n` +
+      `请尽快付款，谢谢！`;
+  } else {
+    text =
+      `Assalamualaikum / Salam sejahtera,\n\n` +
       `Ini adalah peringatan yuran kelas bola keranjang untuk ${student.name}.\n\n` +
       `Bulan: ${month}/${year}\n` +
       `Jumlah tertunggak: RM${amountDue.toFixed(2)}\n\n` +
-      `Sila buat pembayaran secepat mungkin. Terima kasih!`
-  );
+      `Sila buat pembayaran secepat mungkin. Terima kasih!`;
+  }
 
-  return `https://wa.me/${phone}?text=${message}`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
 
 export default function FeesPage() {
@@ -756,25 +768,33 @@ function FeeGroupRows({
                 <History className="h-4 w-4" />
               </Button>
               {row.balance < 0 && row.student.phone && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  asChild
-                  title="发送WhatsApp付费提醒"
-                >
-                  <a
-                    href={getWhatsAppUrl(
-                      row.student,
-                      Math.abs(row.balance),
-                      selectedMonth + 1,
-                      selectedYear
-                    )!}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                <div className="flex items-center gap-0.5">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1 py-0 h-4 text-muted-foreground"
                   >
-                    <MessageCircle className="h-4 w-4 text-green-600" />
-                  </a>
-                </Button>
+                    {getLanguageLabel(row.student.preferred_language)}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                    title="发送WhatsApp付费提醒"
+                  >
+                    <a
+                      href={getWhatsAppUrl(
+                        row.student,
+                        Math.abs(row.balance),
+                        selectedMonth + 1,
+                        selectedYear
+                      )!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <MessageCircle className="h-4 w-4 text-green-600" />
+                    </a>
+                  </Button>
+                </div>
               )}
               <Button
                 variant="outline"

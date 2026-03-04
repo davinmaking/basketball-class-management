@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
+import { detectLanguage } from "@/lib/language";
 
 interface Props {
   open: boolean;
@@ -163,6 +164,7 @@ export function CsvImportDialog({ open, onOpenChange, onSuccess }: Props) {
       relationship: s.relationship || null,
       phone: s.phone || null,
       health_notes: s.health_notes || null,
+      preferred_language: detectLanguage(s.name),
       registered_at: new Date().toISOString(),
     }));
 

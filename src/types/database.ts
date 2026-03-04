@@ -167,6 +167,7 @@ export type Database = {
           name: string
           parent_name: string | null
           phone: string | null
+          preferred_language: string | null
           registered_at: string | null
           relationship: string | null
           school_class: string | null
@@ -181,6 +182,7 @@ export type Database = {
           name: string
           parent_name?: string | null
           phone?: string | null
+          preferred_language?: string | null
           registered_at?: string | null
           relationship?: string | null
           school_class?: string | null
@@ -195,6 +197,7 @@ export type Database = {
           name?: string
           parent_name?: string | null
           phone?: string | null
+          preferred_language?: string | null
           registered_at?: string | null
           relationship?: string | null
           school_class?: string | null
