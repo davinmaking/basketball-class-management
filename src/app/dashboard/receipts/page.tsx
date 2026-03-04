@@ -1,0 +1,222 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Search, Download, Printer } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { toast } from "sonner";
+
+interface ReceiptRow {
+  id: string;
+  receipt_number: string;
+  issued_at: string;
+  amount: number;
+  payment_date: string;
+  month: number;
+  year: number;
+  student_name: string;
+  notes: string | null;
+}
+
+const MONTHS = [
+  "Jan", "Feb", "Mac", "Apr", "Mei", "Jun",
+  "Jul", "Ogo", "Sep", "Okt", "Nov", "Dis",
+];
+
+export default function ReceiptsPage() {
+  const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const supabase = createClient();
+
+  const fetchReceipts = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("receipts")
+      .select(
+        `
+        id,
+        receipt_number,
+        issued_at,
+        payment:payments!inner(
+          amount,
+          payment_date,
+          month,
+          year,
+          notes,
+          student:students!inner(name)
+        )
+      `
+      )
+      .order("issued_at", { ascending: false });
+
+    if (error) {
+      toast.error("Gagal memuatkan resit");
+      setLoading(false);
+      return;
+    }
+
+    const rows: ReceiptRow[] = (data ?? []).map((r: any) => ({
+      id: r.id,
+      receipt_number: r.receipt_number,
+      issued_at: r.issued_at,
+      amount: r.payment.amount,
+      payment_date: r.payment.payment_date,
+      month: r.payment.month,
+      year: r.payment.year,
+      student_name: r.payment.student.name,
+      notes: r.payment.notes,
+    }));
+
+    setReceipts(rows);
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchReceipts();
+  }, [fetchReceipts]);
+
+  const filtered = receipts.filter(
+    (r) =>
+      r.student_name.toLowerCase().includes(search.toLowerCase()) ||
+      r.receipt_number.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function printReceipt(receipt: ReceiptRow) {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Resit ${receipt.receipt_number}</title>
+        <style>
+          body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .header h1 { font-size: 20px; margin: 0; }
+          .header p { color: #666; font-size: 14px; }
+          .divider { border-top: 1px dashed #ccc; margin: 15px 0; }
+          .row { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+          .row .label { color: #666; }
+          .total { font-size: 18px; font-weight: bold; margin: 15px 0; text-align: center; }
+          .footer { text-align: center; color: #999; font-size: 12px; margin-top: 30px; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>RESIT PEMBAYARAN</h1>
+          <p>Kelas Latihan Bola Keranjang</p>
+        </div>
+        <div class="divider"></div>
+        <div class="row"><span class="label">No. Resit:</span><span>${receipt.receipt_number}</span></div>
+        <div class="row"><span class="label">Tarikh:</span><span>${format(parseISO(receipt.issued_at), "dd/MM/yyyy")}</span></div>
+        <div class="row"><span class="label">Pelajar:</span><span>${receipt.student_name}</span></div>
+        <div class="row"><span class="label">Tempoh:</span><span>${MONTHS[receipt.month - 1]} ${receipt.year}</span></div>
+        ${receipt.notes ? `<div class="row"><span class="label">Nota:</span><span>${receipt.notes}</span></div>` : ""}
+        <div class="divider"></div>
+        <div class="total">RM ${Number(receipt.amount).toFixed(2)}</div>
+        <div class="divider"></div>
+        <div class="footer">
+          <p>Terima kasih atas pembayaran anda.</p>
+        </div>
+        <script>window.print();</script>
+      </body>
+      </html>
+    `;
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
+  }
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-6">Resit</h1>
+
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Cari resit atau nama pelajar..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>No. Resit</TableHead>
+                <TableHead>Pelajar</TableHead>
+                <TableHead>Tempoh</TableHead>
+                <TableHead className="text-right">Jumlah</TableHead>
+                <TableHead>Tarikh</TableHead>
+                <TableHead className="text-right">Tindakan</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    Memuatkan...
+                  </TableCell>
+                </TableRow>
+              ) : filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    {search ? "Tiada resit ditemui" : "Belum ada resit"}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((receipt) => (
+                  <TableRow key={receipt.id}>
+                    <TableCell className="font-mono text-sm">
+                      {receipt.receipt_number}
+                    </TableCell>
+                    <TableCell>{receipt.student_name}</TableCell>
+                    <TableCell>
+                      {MONTHS[receipt.month - 1]} {receipt.year}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      RM {Number(receipt.amount).toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      {format(parseISO(receipt.issued_at), "dd/MM/yyyy")}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => printReceipt(receipt)}
+                      >
+                        <Printer className="h-4 w-4 mr-1" />
+                        Cetak
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <p className="text-sm text-muted-foreground mt-2">
+        {filtered.length} resit
+      </p>
+    </div>
+  );
+}
