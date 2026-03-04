@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { APP_CONFIG } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Basketball Manager",
-  description: "Pengurusan Kelas Latihan Bola Keranjang",
+  title: APP_CONFIG.appName,
+  description: `${APP_CONFIG.classNameBm} - ${APP_CONFIG.schoolName}`,
 };
 
 export default function RootLayout({

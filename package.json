@@ -1,7 +1,8 @@
 {
   "name": "basketball-class-management",
   "version": "0.1.0",
-  "private": true,
+  "description": "Web app for managing school-based sports training classes - attendance, fees, receipts, and parent portal",
+  "keywords": ["next.js", "supabase", "school", "attendance", "fee-management", "malaysia"],
   "scripts": {
     "dev": "next dev",
     "build": "next build",

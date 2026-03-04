@@ -6,5 +6,3 @@ export const MONTHS = [
 export const DAYS_OF_WEEK = [
   "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
 ];
-
-export const FEE_PER_SESSION = 5; // RM5

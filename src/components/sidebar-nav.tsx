@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { createClient } from "@/lib/supabase/client";
+import { APP_CONFIG } from "@/lib/config";
 import { useState, useEffect } from "react";
 
 const navItems = [
@@ -64,7 +65,7 @@ export function SidebarNav() {
     <TooltipProvider>
       {/* Mobile header */}
       <div className="md:hidden flex items-center justify-between p-4 border-b bg-background sticky top-0 z-50">
-        <h1 className="font-bold text-lg">篮球训练班管理</h1>
+        <h1 className="font-bold text-lg">{APP_CONFIG.appName}</h1>
         <Button
           variant="ghost"
           size="icon"
@@ -106,10 +107,7 @@ export function SidebarNav() {
             <span className="text-lg font-bold">🏀</span>
           ) : (
             <div className="min-w-0">
-              <h1 className="font-bold text-lg truncate">篮球训练班管理</h1>
-              <p className="text-sm text-muted-foreground truncate">
-                训练班管理系统
-              </p>
+              <h1 className="font-bold text-lg truncate">{APP_CONFIG.appName}</h1>
             </div>
           )}
         </div>

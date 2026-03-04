@@ -4,26 +4,24 @@
 Basketball training class management web app for coaches and parents.
 - **Stack**: Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Supabase
 - **Package manager**: npm
-- **Language**: UI text in Chinese (Simplified), code in English. WhatsApp messages in Bahasa Malaysia.
+- **Language**: UI text in Chinese (Simplified), code in English. WhatsApp messages in Bahasa Malaysia or Chinese based on student preference.
 
 ## Supabase
-- **Project ID**: `dkjjmjtevzvseykrjcpq`
-- **Region**: `ap-southeast-1`
 - **Auth**: Email/password for coaches; token-based public URLs for parents
 - **RLS**: Enabled on all tables — authenticated = full access, anon = read access
-- **Note**: Supabase MCP is connected to a different org — use code-side approaches for DB logic
 
 ## Database Schema
-- `students` — name, school_class, parent_name, relationship, phone, health_notes, fee_exempt, active, view_token, registered_at
+- `students` — name, school_class, parent_name, relationship, phone, health_notes, fee_exempt, preferred_language, active, view_token, registered_at
 - `class_sessions` — session_date (unique), notes
 - `attendance` — student_id, session_id, present, fee_exempt (unique on student+session)
 - `payments` — student_id, amount, payment_date, month, year, notes, voided, voided_at, voided_reason
 - `receipts` — payment_id, receipt_number (unique), issued_at, voided
 
 ## Key Business Rules
-- Fee rate: RM5 per session (defined in `src/lib/constants.ts`)
+- Fee rate and currency configurable via env vars (see `src/lib/config.ts`)
 - Fee-exempt: controlled per-student (`students.fee_exempt`), used as default for attendance `fee_exempt` toggle
-- Receipt number format: `RCP-{year}-{sequential}`, generated with year-scoped query + retry on unique constraint (error 23505)
+- Receipt number format: `{prefix}-{year}-{sequential}`, generated with year-scoped query + retry on unique constraint (error 23505)
+- Receipt format: bilingual (BM + Chinese) school format with signature line and stamp area
 - Parent portal: `/view/[token]?year=YYYY` — no auth required, read-only, supports year navigation
 - CSV import auto-maps columns by keyword matching (Malay + English), includes duplicate name detection
 - Session deletion blocked when month has non-voided payments
@@ -33,11 +31,13 @@ Basketball training class management web app for coaches and parents.
 - `/src/app/login/` — Auth (login + signup)
 - `/src/app/dashboard/` — Protected coach area (students, sessions, attendance, fees, receipts)
 - `/src/app/view/[token]/` — Public parent portal (server component)
+- `/src/lib/config.ts` — Environment-based configuration (app name, school info, fee rate, currency)
 - `/src/lib/supabase/` — client.ts, server.ts, middleware.ts
-- `/src/lib/constants.ts` — MONTHS, DAYS_OF_WEEK, FEE_PER_SESSION
+- `/src/lib/constants.ts` — MONTHS, DAYS_OF_WEEK
 - `/src/lib/student-groups.ts` — `groupStudentsByClass()` shared utility
-- `/src/lib/receipt-html.ts` — `generateReceiptHtml()`, `printReceiptHtml()` shared utility
+- `/src/lib/receipt-html.ts` — `generateReceiptHtml()`, `printReceiptHtml()` bilingual receipt
 - `/src/lib/phone.ts` — `normalizePhone()` for sibling detection
+- `/src/lib/language.ts` — `detectLanguage()`, `getLanguageLabel()` for WhatsApp message language
 - `/src/components/sidebar-nav.tsx` — Dashboard navigation (collapsible)
 - `/src/middleware.ts` — Auth route protection
 
@@ -47,6 +47,7 @@ Basketball training class management web app for coaches and parents.
 - Delete operations use shadcn AlertDialog for confirmation
 - Shared logic extracted to `/src/lib/` — prefer reuse over inline duplication
 - Receipt print opens popup window — handle blocked popups with toast feedback
+- All hardcoded values (app name, school info, currency, fee rate) use `APP_CONFIG` from `src/lib/config.ts`
 
 ## Dev Commands
 - `npm run dev` — Start dev server (port 3000)
@@ -57,7 +58,3 @@ Basketball training class management web app for coaches and parents.
 - Always confirm remote account before pushing
 - Never push without explicit user approval
 - Stage specific files, never `git add -A`
-
-## Test Account
-- Email: `coach@basketball.com`
-- Password: `coach123`

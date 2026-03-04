@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ParentReceiptButton } from "./receipt-button";
-import { FEE_PER_SESSION } from "@/lib/constants";
+import { APP_CONFIG } from "@/lib/config";
 
 export default async function ParentViewPage({
   params,
@@ -113,7 +113,7 @@ export default async function ParentViewPage({
       chargeableSessionIds.has(s.id)
     ).length;
 
-    const due = chargeable * FEE_PER_SESSION;
+    const due = chargeable * APP_CONFIG.feePerSession;
     const paid = (payments ?? [])
       .filter((p) => p.month === month && !p.voided)
       .reduce((s, p) => s + Number(p.amount), 0);
@@ -135,7 +135,7 @@ export default async function ParentViewPage({
     <div className="min-h-screen bg-muted/30 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold">篮球训练班</h1>
+          <h1 className="text-2xl font-bold">{APP_CONFIG.className}</h1>
           <p className="text-muted-foreground">家长门户</p>
         </div>
 
@@ -186,7 +186,7 @@ export default async function ParentViewPage({
               <CardTitle className="text-sm">{displayYear}年总费用</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">RM {totalDue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{APP_CONFIG.currency} {totalDue.toFixed(2)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -194,7 +194,7 @@ export default async function ParentViewPage({
               <CardTitle className="text-sm">已支付</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">RM {totalPaid.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{APP_CONFIG.currency} {totalPaid.toFixed(2)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -207,7 +207,7 @@ export default async function ParentViewPage({
                   totalPaid - totalDue >= 0 ? "text-green-600" : "text-destructive"
                 }`}
               >
-                RM {(totalPaid - totalDue).toFixed(2)}
+                {APP_CONFIG.currency} {(totalPaid - totalDue).toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -247,10 +247,10 @@ export default async function ParentViewPage({
                         {m.attended} / {m.totalSessions}
                       </TableCell>
                       <TableCell className="text-right">
-                        RM {m.due.toFixed(2)}
+                        {APP_CONFIG.currency} {m.due.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
-                        RM {m.paid.toFixed(2)}
+                        {APP_CONFIG.currency} {m.paid.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right">
                         <span
@@ -262,7 +262,7 @@ export default async function ParentViewPage({
                               : ""
                           }
                         >
-                          RM {m.balance.toFixed(2)}
+                          {APP_CONFIG.currency} {m.balance.toFixed(2)}
                         </span>
                       </TableCell>
                     </TableRow>
@@ -305,7 +305,7 @@ export default async function ParentViewPage({
                           )}
                         </TableCell>
                         <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
-                          RM {Number(payment.amount).toFixed(2)}
+                          {APP_CONFIG.currency} {Number(payment.amount).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
                           {receipt && !isVoided && (
@@ -313,6 +313,7 @@ export default async function ParentViewPage({
                               receiptNumber={receipt.receipt_number}
                               issuedAt={receipt.issued_at ?? ""}
                               studentName={student.name}
+                              schoolClass={student.school_class}
                               amount={Number(payment.amount)}
                               month={payment.month}
                               year={payment.year}
@@ -330,7 +331,7 @@ export default async function ParentViewPage({
         )}
 
         <p className="text-center text-sm text-muted-foreground">
-          费率: RM{FEE_PER_SESSION} / 课
+          费率: {APP_CONFIG.currency}{APP_CONFIG.feePerSession} / 课
         </p>
       </div>
     </div>

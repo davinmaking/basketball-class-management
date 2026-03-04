@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Calendar, ClipboardCheck, DollarSign } from "lucide-react";
+import { APP_CONFIG } from "@/lib/config";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -69,7 +70,7 @@ export default async function DashboardPage() {
     },
     {
       title: "本月收款",
-      value: `RM ${monthPayments.toFixed(2)}`,
+      value: `${APP_CONFIG.currency} ${monthPayments.toFixed(2)}`,
       icon: DollarSign,
       description: `${currentYear}年${currentMonth}月`,
     },

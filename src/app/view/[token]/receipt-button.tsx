@@ -9,6 +9,7 @@ interface Props {
   receiptNumber: string;
   issuedAt: string;
   studentName: string;
+  schoolClass?: string | null;
   amount: number;
   month: number;
   year: number;
@@ -19,6 +20,7 @@ export function ParentReceiptButton({
   receiptNumber,
   issuedAt,
   studentName,
+  schoolClass,
   amount,
   month,
   year,
@@ -29,6 +31,7 @@ export function ParentReceiptButton({
       receiptNumber,
       issuedAt: issuedAt || null,
       studentName,
+      schoolClass,
       amount,
       month,
       year,

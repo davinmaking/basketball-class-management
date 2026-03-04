@@ -28,6 +28,7 @@ import { Search, Printer, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { printReceiptHtml } from "@/lib/receipt-html";
+import { APP_CONFIG } from "@/lib/config";
 
 interface ReceiptRow {
   id: string;
@@ -39,6 +40,7 @@ interface ReceiptRow {
   month: number;
   year: number;
   student_name: string;
+  school_class: string | null;
   notes: string | null;
   voided: boolean;
   payment_voided: boolean;
@@ -71,7 +73,7 @@ export default function ReceiptsPage() {
           year,
           notes,
           voided,
-          student:students!inner(name)
+          student:students!inner(name, school_class)
         )
       `
       )
@@ -93,6 +95,7 @@ export default function ReceiptsPage() {
       month: r.payment.month,
       year: r.payment.year,
       student_name: r.payment.student.name,
+      school_class: r.payment.student.school_class ?? null,
       notes: r.payment.notes,
       voided: r.voided ?? false,
       payment_voided: r.payment.voided ?? false,
@@ -117,6 +120,7 @@ export default function ReceiptsPage() {
       receiptNumber: receipt.receipt_number,
       issuedAt: receipt.issued_at,
       studentName: receipt.student_name,
+      schoolClass: receipt.school_class,
       amount: Number(receipt.amount),
       month: receipt.month,
       year: receipt.year,
@@ -213,7 +217,7 @@ export default function ReceiptsPage() {
                         {receipt.year}年{receipt.month}月
                       </TableCell>
                       <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
-                        RM {Number(receipt.amount).toFixed(2)}
+                        {APP_CONFIG.currency} {Number(receipt.amount).toFixed(2)}
                       </TableCell>
                       <TableCell className={isVoided ? "line-through" : ""}>
                         {receipt.issued_at

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { APP_CONFIG } from "@/lib/config";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -61,7 +62,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">篮球训练班管理</CardTitle>
+          <CardTitle className="text-2xl">{APP_CONFIG.appName}</CardTitle>
           <CardDescription>
             {isSignUp
               ? "注册新教练账号"

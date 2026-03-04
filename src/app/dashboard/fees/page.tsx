@@ -44,7 +44,8 @@ import { DollarSign, MessageCircle, History, Trash2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { formatPhoneForWhatsApp } from "@/lib/phone";
-import { MONTHS, FEE_PER_SESSION } from "@/lib/constants";
+import { MONTHS } from "@/lib/constants";
+import { APP_CONFIG } from "@/lib/config";
 import { getLanguageLabel } from "@/lib/language";
 
 type Student = Tables<"students">;
@@ -85,16 +86,16 @@ function getWhatsAppUrl(
   if (lang === "zh") {
     text =
       `您好，\n\n` +
-      `这是篮球训练班缴费提醒（${student.name}）。\n\n` +
+      `这是${APP_CONFIG.className}缴费提醒（${student.name}）。\n\n` +
       `月份: ${year}年${month}月\n` +
-      `欠缴金额: RM${amountDue.toFixed(2)}\n\n` +
+      `欠缴金额: ${APP_CONFIG.currency}${amountDue.toFixed(2)}\n\n` +
       `请尽快付款，谢谢！`;
   } else {
     text =
       `Assalamualaikum / Salam sejahtera,\n\n` +
-      `Ini adalah peringatan yuran kelas bola keranjang untuk ${student.name}.\n\n` +
+      `Ini adalah peringatan yuran ${APP_CONFIG.classNameBm.toLowerCase()} untuk ${student.name}.\n\n` +
       `Bulan: ${month}/${year}\n` +
-      `Jumlah tertunggak: RM${amountDue.toFixed(2)}\n\n` +
+      `Jumlah tertunggak: ${APP_CONFIG.currency}${amountDue.toFixed(2)}\n\n` +
       `Sila buat pembayaran secepat mungkin. Terima kasih!`;
   }
 
@@ -181,7 +182,7 @@ export default function FeesPage() {
       .filter((s) => s.active !== false)
       .map((student) => {
         const sessionsAttended = attendanceCounts[student.id] ?? 0;
-        const amountDue = sessionsAttended * FEE_PER_SESSION;
+        const amountDue = sessionsAttended * APP_CONFIG.feePerSession;
         const totalPaid = paymentSums[student.id] ?? 0;
         const balance = totalPaid - amountDue;
 
@@ -251,7 +252,7 @@ export default function FeesPage() {
       const { data: lastReceipt } = await supabase
         .from("receipts")
         .select("receipt_number")
-        .like("receipt_number", `RCP-${selectedYear}-%`)
+        .like("receipt_number", `${APP_CONFIG.receiptPrefix}-${selectedYear}-%`)
         .order("receipt_number", { ascending: false })
         .limit(1)
         .single();
@@ -262,7 +263,7 @@ export default function FeesPage() {
         nextNum = parseInt(parts[parts.length - 1]) + 1;
       }
 
-      receiptNumber = `RCP-${selectedYear}-${String(nextNum).padStart(3, "0")}`;
+      receiptNumber = `${APP_CONFIG.receiptPrefix}-${selectedYear}-${String(nextNum).padStart(3, "0")}`;
 
       const { error: receiptError } = await supabase.from("receipts").insert({
         payment_id: paymentData.id,
@@ -285,7 +286,7 @@ export default function FeesPage() {
     }
 
     toast.success(
-      `已记录付款 RM${amount.toFixed(2)}。收据: ${receiptNumber}`
+      `已记录付款 ${APP_CONFIG.currency}${amount.toFixed(2)}。收据: ${receiptNumber}`
     );
     setSavingPayment(false);
     setShowPayment(false);
@@ -442,7 +443,7 @@ export default function FeesPage() {
             <CardTitle className="text-sm font-medium">应缴总额</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">RM {totalDue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{APP_CONFIG.currency} {totalDue.toFixed(2)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -450,7 +451,7 @@ export default function FeesPage() {
             <CardTitle className="text-sm font-medium">已收总额</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">RM {totalPaid.toFixed(2)}</div>
+            <div className="text-2xl font-bold">{APP_CONFIG.currency} {totalPaid.toFixed(2)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -459,7 +460,7 @@ export default function FeesPage() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalBalance >= 0 ? "text-green-600" : "text-destructive"}`}>
-              RM {totalBalance.toFixed(2)}
+              {APP_CONFIG.currency} {totalBalance.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
               {totalBalance > 0 ? "多缴" : totalBalance < 0 ? "未缴" : "已结清"}
@@ -512,7 +513,7 @@ export default function FeesPage() {
       </Card>
 
       <p className="text-sm text-muted-foreground mt-2">
-        费率: RM{FEE_PER_SESSION} / 课
+        费率: {APP_CONFIG.currency}{APP_CONFIG.feePerSession} / 课
       </p>
 
       {/* Payment history dialog */}
@@ -543,7 +544,7 @@ export default function FeesPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className={`font-medium ${payment.voided ? "line-through" : ""}`}>
-                        RM {Number(payment.amount).toFixed(2)}
+                        {APP_CONFIG.currency} {Number(payment.amount).toFixed(2)}
                       </span>
                       {payment.voided ? (
                         <div className="flex items-center gap-2">
@@ -660,7 +661,7 @@ export default function FeesPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="pay-amount">金额 (RM)</Label>
+              <Label htmlFor="pay-amount">金额 ({APP_CONFIG.currency})</Label>
               <Input
                 id="pay-amount"
                 type="number"
@@ -739,10 +740,10 @@ function FeeGroupRows({
             {row.sessionsAttended}
           </TableCell>
           <TableCell className="text-right">
-            RM {row.amountDue.toFixed(2)}
+            {APP_CONFIG.currency} {row.amountDue.toFixed(2)}
           </TableCell>
           <TableCell className="text-right">
-            RM {row.totalPaid.toFixed(2)}
+            {APP_CONFIG.currency} {row.totalPaid.toFixed(2)}
           </TableCell>
           <TableCell className="text-right">
             <span
@@ -754,7 +755,7 @@ function FeeGroupRows({
                   : ""
               }
             >
-              RM {row.balance.toFixed(2)}
+              {APP_CONFIG.currency} {row.balance.toFixed(2)}
             </span>
           </TableCell>
           <TableCell className="text-right">

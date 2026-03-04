@@ -1,9 +1,11 @@
 import { format, parseISO } from "date-fns";
+import { APP_CONFIG } from "./config";
 
 interface ReceiptData {
   receiptNumber: string;
   issuedAt: string | null;
   studentName: string;
+  schoolClass?: string | null;
   amount: number;
   month: number;
   year: number;
@@ -11,52 +13,190 @@ interface ReceiptData {
 }
 
 /**
- * Generates receipt HTML string for printing in a new window.
+ * Generates receipt HTML in bilingual Malaysian school format (BM + Chinese).
  */
 export function generateReceiptHtml(data: ReceiptData): string {
   const dateStr = data.issuedAt
     ? format(parseISO(data.issuedAt), "dd/MM/yyyy")
     : "-";
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>收据 ${data.receiptNumber}</title>
-      <style>
-        body { font-family: Arial, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .header h1 { font-size: 20px; margin: 0; }
-        .header p { color: #666; font-size: 14px; }
-        .divider { border-top: 1px dashed #ccc; margin: 15px 0; }
-        .row { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
-        .row .label { color: #666; }
-        .total { font-size: 18px; font-weight: bold; margin: 15px 0; text-align: center; }
-        .footer { text-align: center; color: #999; font-size: 12px; margin-top: 30px; }
-        @media print { body { margin: 0; } }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>付款收据</h1>
-        <p>篮球训练班</p>
-      </div>
-      <div class="divider"></div>
-      <div class="row"><span class="label">收据号:</span><span>${data.receiptNumber}</span></div>
-      <div class="row"><span class="label">日期:</span><span>${dateStr}</span></div>
-      <div class="row"><span class="label">学生:</span><span>${data.studentName}</span></div>
-      <div class="row"><span class="label">期间:</span><span>${data.year}年${data.month}月</span></div>
-      ${data.notes ? `<div class="row"><span class="label">备注:</span><span>${data.notes}</span></div>` : ""}
-      <div class="divider"></div>
-      <div class="total">RM ${data.amount.toFixed(2)}</div>
-      <div class="divider"></div>
-      <div class="footer">
-        <p>感谢您的付款。</p>
-      </div>
-      <script>window.print();</script>
-    </body>
-    </html>
-  `;
+  const schoolAddress = APP_CONFIG.schoolAddress
+    ? `<p class="school-address">${APP_CONFIG.schoolAddress}</p>`
+    : "";
+
+  const schoolPhone = APP_CONFIG.schoolPhone
+    ? `<p class="school-phone">Tel: ${APP_CONFIG.schoolPhone}</p>`
+    : "";
+
+  const schoolClassRow = data.schoolClass
+    ? `<tr>
+        <td class="label">Kelas / 班级:</td>
+        <td class="value">${data.schoolClass}</td>
+      </tr>`
+    : "";
+
+  const notesRow = data.notes
+    ? `<tr>
+        <td class="label">Catatan / 备注:</td>
+        <td class="value">${data.notes}</td>
+      </tr>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <title>Resit ${data.receiptNumber}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 30px 25px;
+      font-size: 13px;
+      color: #333;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    .school-address, .school-phone {
+      font-size: 11px;
+      color: #666;
+    }
+    .receipt-title {
+      text-align: center;
+      font-size: 15px;
+      font-weight: bold;
+      margin: 16px 0 12px;
+      padding: 6px 0;
+      border-top: 2px solid #333;
+      border-bottom: 2px solid #333;
+    }
+    .info-table {
+      width: 100%;
+      margin-bottom: 16px;
+    }
+    .info-table td {
+      padding: 4px 0;
+      vertical-align: top;
+    }
+    .info-table .label {
+      color: #666;
+      width: 160px;
+      white-space: nowrap;
+    }
+    .info-table .value {
+      font-weight: 500;
+    }
+    .amount-box {
+      border: 2px solid #333;
+      padding: 10px;
+      margin: 16px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    .signature-section {
+      margin-top: 30px;
+      display: flex;
+      justify-content: space-between;
+      gap: 30px;
+    }
+    .signature-block {
+      flex: 1;
+      text-align: center;
+    }
+    .signature-line {
+      border-bottom: 1px solid #333;
+      margin-bottom: 6px;
+      height: 50px;
+    }
+    .signature-label {
+      font-size: 11px;
+      color: #666;
+    }
+    .stamp-area {
+      margin-top: 24px;
+      text-align: center;
+    }
+    .stamp-box {
+      display: inline-block;
+      width: 120px;
+      height: 80px;
+      border: 1px dashed #ccc;
+      margin-bottom: 6px;
+    }
+    .stamp-label {
+      font-size: 11px;
+      color: #999;
+    }
+    @media print {
+      body { margin: 0; padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${APP_CONFIG.schoolName}</h1>
+    ${schoolAddress}
+    ${schoolPhone}
+  </div>
+
+  <div class="receipt-title">RESIT RASMI / 正式收据</div>
+
+  <table class="info-table">
+    <tr>
+      <td class="label">No. Resit / 收据号:</td>
+      <td class="value">${data.receiptNumber}</td>
+    </tr>
+    <tr>
+      <td class="label">Tarikh / 日期:</td>
+      <td class="value">${dateStr}</td>
+    </tr>
+    <tr>
+      <td class="label">Nama Murid / 学生:</td>
+      <td class="value">${data.studentName}</td>
+    </tr>
+    ${schoolClassRow}
+    <tr>
+      <td class="label">Keterangan / 项目:</td>
+      <td class="value">Yuran ${APP_CONFIG.classNameBm} - ${data.month}/${data.year}</td>
+    </tr>
+    ${notesRow}
+  </table>
+
+  <div class="amount-box">
+    <span>Jumlah / 金额:</span>
+    <span>${APP_CONFIG.currency} ${data.amount.toFixed(2)}</span>
+  </div>
+
+  <div class="signature-section">
+    <div class="signature-block">
+      <div class="signature-line"></div>
+      <div class="signature-label">Diterima oleh / 收款人</div>
+    </div>
+    <div class="signature-block">
+      <div class="signature-line"></div>
+      <div class="signature-label">Tandatangan Pelajar / 学生签名</div>
+    </div>
+  </div>
+
+  <div class="stamp-area">
+    <div class="stamp-box"></div>
+    <div class="stamp-label">Cop Sekolah / 校方盖章</div>
+  </div>
+
+  <script>window.print();</script>
+</body>
+</html>`;
 }
 
 /**
