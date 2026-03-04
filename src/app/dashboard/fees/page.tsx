@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Tables } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -151,6 +151,15 @@ export default function FeesPage() {
         return { student, sessionsAttended, amountDue, totalPaid, balance };
       });
 
+    // Sort by school_class (nulls last), then by student name
+    rows.sort((a, b) => {
+      const classA = a.student.school_class || "\uffff";
+      const classB = b.student.school_class || "\uffff";
+      const classCompare = classA.localeCompare(classB, "zh");
+      if (classCompare !== 0) return classCompare;
+      return a.student.name.localeCompare(b.student.name, "zh");
+    });
+
     setFeeData(rows);
     setLoading(false);
   }, [supabase, selectedMonth, selectedYear]);
@@ -288,6 +297,23 @@ export default function FeesPage() {
     fetchFees();
   }
 
+  // Group fee data by class for rendering
+  const groupedFeeData = useMemo(() => {
+    const groups: { className: string; rows: FeeRow[] }[] = [];
+    let currentClass: string | null = null;
+
+    feeData.forEach((row) => {
+      const cls = row.student.school_class || "未分班";
+      if (cls !== currentClass) {
+        currentClass = cls;
+        groups.push({ className: cls, rows: [] });
+      }
+      groups[groups.length - 1].rows.push(row);
+    });
+
+    return groups;
+  }, [feeData]);
+
   const totalDue = feeData.reduce((s, r) => s + r.amountDue, 0);
   const totalPaid = feeData.reduce((s, r) => s + r.totalPaid, 0);
   const totalBalance = totalPaid - totalDue;
@@ -381,80 +407,15 @@ export default function FeesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                feeData.map((row) => (
-                  <TableRow key={row.student.id}>
-                    <TableCell>
-                      <span className="font-medium">{row.student.name}</span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {row.sessionsAttended}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      RM {row.amountDue.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      RM {row.totalPaid.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <span
-                        className={
-                          row.balance > 0
-                            ? "text-green-600"
-                            : row.balance < 0
-                            ? "text-destructive"
-                            : ""
-                        }
-                      >
-                        RM {row.balance.toFixed(2)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="付款记录"
-                          onClick={() => openHistory(row.student)}
-                        >
-                          <History className="h-4 w-4" />
-                        </Button>
-                        {row.balance < 0 && row.student.phone && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            asChild
-                            title="发送WhatsApp付费提醒"
-                          >
-                            <a
-                              href={getWhatsAppUrl(
-                                row.student,
-                                Math.abs(row.balance),
-                                selectedMonth + 1,
-                                selectedYear
-                              )!}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <MessageCircle className="h-4 w-4 text-green-600" />
-                            </a>
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            openPaymentDialog(
-                              row.student,
-                              row.balance < 0 ? Math.abs(row.balance) : 0
-                            )
-                          }
-                        >
-                          <DollarSign className="h-4 w-4 mr-1" />
-                          付款
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                groupedFeeData.map((group) => (
+                  <FeeGroupRows
+                    key={group.className}
+                    group={group}
+                    selectedMonth={selectedMonth}
+                    selectedYear={selectedYear}
+                    onOpenHistory={openHistory}
+                    onOpenPayment={openPaymentDialog}
+                  />
                 ))
               )}
             </TableBody>
@@ -615,5 +576,111 @@ export default function FeesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ── Fee group rows component ─────────────────────────────
+
+function FeeGroupRows({
+  group,
+  selectedMonth,
+  selectedYear,
+  onOpenHistory,
+  onOpenPayment,
+}: {
+  group: { className: string; rows: FeeRow[] };
+  selectedMonth: number;
+  selectedYear: number;
+  onOpenHistory: (student: Student) => void;
+  onOpenPayment: (student: Student, suggestedAmount: number) => void;
+}) {
+  return (
+    <>
+      {/* Group header */}
+      <TableRow className="bg-muted/50">
+        <TableCell colSpan={6} className="py-1.5">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {group.className}（{group.rows.length}人）
+          </span>
+        </TableCell>
+      </TableRow>
+
+      {/* Fee rows */}
+      {group.rows.map((row) => (
+        <TableRow key={row.student.id}>
+          <TableCell>
+            <span className="font-medium">{row.student.name}</span>
+          </TableCell>
+          <TableCell className="text-center">
+            {row.sessionsAttended}
+          </TableCell>
+          <TableCell className="text-right">
+            RM {row.amountDue.toFixed(2)}
+          </TableCell>
+          <TableCell className="text-right">
+            RM {row.totalPaid.toFixed(2)}
+          </TableCell>
+          <TableCell className="text-right">
+            <span
+              className={
+                row.balance > 0
+                  ? "text-green-600"
+                  : row.balance < 0
+                  ? "text-destructive"
+                  : ""
+              }
+            >
+              RM {row.balance.toFixed(2)}
+            </span>
+          </TableCell>
+          <TableCell className="text-right">
+            <div className="flex justify-end gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                title="付款记录"
+                onClick={() => onOpenHistory(row.student)}
+              >
+                <History className="h-4 w-4" />
+              </Button>
+              {row.balance < 0 && row.student.phone && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  asChild
+                  title="发送WhatsApp付费提醒"
+                >
+                  <a
+                    href={getWhatsAppUrl(
+                      row.student,
+                      Math.abs(row.balance),
+                      selectedMonth + 1,
+                      selectedYear
+                    )!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MessageCircle className="h-4 w-4 text-green-600" />
+                  </a>
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  onOpenPayment(
+                    row.student,
+                    row.balance < 0 ? Math.abs(row.balance) : 0
+                  )
+                }
+              >
+                <DollarSign className="h-4 w-4 mr-1" />
+                付款
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
   );
 }

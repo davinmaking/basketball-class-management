@@ -64,7 +64,32 @@ export default function StudentsPage() {
         s.name.toLowerCase().includes(search.toLowerCase()) ||
         s.school_class?.toLowerCase().includes(search.toLowerCase()) ||
         s.parent_name?.toLowerCase().includes(search.toLowerCase())
-    );
+    )
+    .sort((a, b) => {
+      // Sort by school_class (nulls last), then by name
+      const classA = a.school_class || "\uffff";
+      const classB = b.school_class || "\uffff";
+      const classCompare = classA.localeCompare(classB, "zh");
+      if (classCompare !== 0) return classCompare;
+      return a.name.localeCompare(b.name, "zh");
+    });
+
+  // Group filtered students by school_class for rendering headers
+  const groupedFiltered = useMemo(() => {
+    const groups: { className: string; students: Student[] }[] = [];
+    let currentClass: string | null = null;
+
+    filtered.forEach((s) => {
+      const cls = s.school_class || "未分班";
+      if (cls !== currentClass) {
+        currentClass = cls;
+        groups.push({ className: cls, students: [] });
+      }
+      groups[groups.length - 1].students.push(s);
+    });
+
+    return groups;
+  }, [filtered]);
 
   // Build sibling groups by phone number
   const siblingGroups = useMemo(() => {
@@ -163,73 +188,14 @@ export default function StudentsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map((student) => (
-                  <TableRow key={student.id} className={student.active === false ? "opacity-60" : ""}>
-                    <TableCell className="font-medium">
-                      {student.name}
-                      {siblingGroups.has(student.id) && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="inline-flex items-center gap-1 ml-2 text-blue-600 cursor-default">
-                              <Users className="h-3.5 w-3.5" />
-                              <span className="text-xs">
-                                兄弟姐妹({siblingGroups.get(student.id)!.length})
-                              </span>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-sm font-medium">兄弟姐妹:</p>
-                            {siblingGroups.get(student.id)!.map((sibling) => (
-                              <p key={sibling.id} className="text-sm">
-                                {sibling.name}
-                                {sibling.school_class && ` (${sibling.school_class})`}
-                              </p>
-                            ))}
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </TableCell>
-                    <TableCell>{student.school_class ?? "-"}</TableCell>
-                    <TableCell>
-                      {student.parent_name ?? "-"}
-                      {student.relationship && (
-                        <span className="text-muted-foreground ml-1">
-                          ({student.relationship})
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>{student.phone ?? "-"}</TableCell>
-                    <TableCell>
-                      {student.active === false && (
-                        <Badge variant="destructive" className="mr-1">非活跃</Badge>
-                      )}
-                      {student.health_notes && (
-                        <Badge variant="outline" className="ml-1">
-                          健康备注
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="复制家长链接"
-                          onClick={() => copyViewLink(student.view_token)}
-                        >
-                          <Link2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="编辑"
-                          onClick={() => setEditingStudent(student)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                groupedFiltered.map((group) => (
+                  <GroupedStudentRows
+                    key={group.className}
+                    group={group}
+                    siblingGroups={siblingGroups}
+                    onCopyLink={copyViewLink}
+                    onEdit={setEditingStudent}
+                  />
                 ))
               )}
             </TableBody>
@@ -262,5 +228,102 @@ export default function StudentsPage() {
         )}
       </div>
     </TooltipProvider>
+  );
+}
+
+// ── Grouped student rows ─────────────────────────────────
+
+function GroupedStudentRows({
+  group,
+  siblingGroups,
+  onCopyLink,
+  onEdit,
+}: {
+  group: { className: string; students: Student[] };
+  siblingGroups: Map<string, Student[]>;
+  onCopyLink: (token: string | null) => void;
+  onEdit: (student: Student) => void;
+}) {
+  return (
+    <>
+      {/* Group header */}
+      <TableRow className="bg-muted/50">
+        <TableCell colSpan={6} className="py-1.5">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {group.className}（{group.students.length}人）
+          </span>
+        </TableCell>
+      </TableRow>
+
+      {/* Student rows */}
+      {group.students.map((student) => (
+        <TableRow key={student.id} className={student.active === false ? "opacity-60" : ""}>
+          <TableCell className="font-medium">
+            {student.name}
+            {siblingGroups.has(student.id) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center gap-1 ml-2 text-blue-600 cursor-default">
+                    <Users className="h-3.5 w-3.5" />
+                    <span className="text-xs">
+                      兄弟姐妹({siblingGroups.get(student.id)!.length})
+                    </span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-sm font-medium">兄弟姐妹:</p>
+                  {siblingGroups.get(student.id)!.map((sibling) => (
+                    <p key={sibling.id} className="text-sm">
+                      {sibling.name}
+                      {sibling.school_class && ` (${sibling.school_class})`}
+                    </p>
+                  ))}
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </TableCell>
+          <TableCell>{student.school_class ?? "-"}</TableCell>
+          <TableCell>
+            {student.parent_name ?? "-"}
+            {student.relationship && (
+              <span className="text-muted-foreground ml-1">
+                ({student.relationship})
+              </span>
+            )}
+          </TableCell>
+          <TableCell>{student.phone ?? "-"}</TableCell>
+          <TableCell>
+            {student.active === false && (
+              <Badge variant="destructive" className="mr-1">非活跃</Badge>
+            )}
+            {student.health_notes && (
+              <Badge variant="outline" className="ml-1">
+                健康备注
+              </Badge>
+            )}
+          </TableCell>
+          <TableCell className="text-right">
+            <div className="flex justify-end gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                title="复制家长链接"
+                onClick={() => onCopyLink(student.view_token)}
+              >
+                <Link2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="编辑"
+                onClick={() => onEdit(student)}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
   );
 }
