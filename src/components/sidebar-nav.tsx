@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Users,
-  Calendar,
   ClipboardCheck,
   DollarSign,
   Receipt,
@@ -22,7 +21,6 @@ import { useState } from "react";
 const navItems = [
   { href: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
   { href: "/dashboard/students", label: "学生", icon: Users },
-  { href: "/dashboard/sessions", label: "训练课", icon: Calendar },
   { href: "/dashboard/attendance", label: "出勤", icon: ClipboardCheck },
   { href: "/dashboard/fees", label: "费用", icon: DollarSign },
   { href: "/dashboard/receipts", label: "收据", icon: Receipt },

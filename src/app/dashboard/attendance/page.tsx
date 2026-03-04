@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Tables } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -14,7 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -24,44 +29,139 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { format, parseISO } from "date-fns";
-import { zhCN } from "date-fns/locale";
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  CalendarPlus,
+  ChevronDown,
+  ChevronRight as ChevronRightIcon,
+} from "lucide-react";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  getDay,
+  subDays,
+  addDays,
+  isSameMonth,
+  isToday,
+} from "date-fns";
 import { toast } from "sonner";
-import { Save, AlertTriangle } from "lucide-react";
 import { MONTHS } from "@/lib/constants";
+import { AttendanceDialog } from "./attendance-dialog";
 
 type Session = Tables<"class_sessions">;
 type Student = Tables<"students">;
 
+const DAYS_OF_WEEK = [
+  "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
+];
+
+const CAL_HEADERS = ["一", "二", "三", "四", "五", "六", "日"];
+
 export default function AttendancePage() {
+  const now = new Date();
+
+  // Month navigation
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+
+  // Data
   const [sessions, setSessions] = useState<Session[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [selectedSession, setSelectedSession] = useState<string>("");
-  const [attendance, setAttendance] = useState<Record<string, boolean>>({});
-  const [feeExempt, setFeeExempt] = useState<Record<string, boolean>>({});
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [tab, setTab] = useState("take");
+  const [attendanceBySession, setAttendanceBySession] = useState<
+    Map<string, Set<string>>
+  >(new Map());
 
-  // Summary state
-  const [summaryData, setSummaryData] = useState<
-    { student: Student; attended: number; total: number }[]
-  >([]);
+  // Attendance dialog
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogSession, setDialogSession] = useState<Session | null>(null);
+  const [dialogDate, setDialogDate] = useState("");
+
+  // Bulk/single add dialogs
+  const [showAdd, setShowAdd] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
+  const [newDate, setNewDate] = useState("");
+  const [bulkDay, setBulkDay] = useState("6");
+
+  // Summary
+  const [summaryAttendance, setSummaryAttendance] = useState<
+    Map<string, number>
+  >(new Map());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    new Set()
+  );
+
+  const [loading, setLoading] = useState(true);
 
   const supabase = createClient();
 
-  // Active students only
-  const activeStudents = students.filter((s) => s.active !== false);
+  // Session lookup
+  const sessionMap = useMemo(
+    () => new Map(sessions.map((s) => [s.session_date, s])),
+    [sessions]
+  );
+
+  // Set of session IDs that have at least one attendance record
+  const sessionsWithAttendance = useMemo(() => {
+    const set = new Set<string>();
+    attendanceBySession.forEach((studentSet, sessionId) => {
+      if (studentSet.size > 0) set.add(sessionId);
+    });
+    return set;
+  }, [attendanceBySession]);
+
+  // Calendar grid
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(new Date(selectedYear, selectedMonth));
+    const monthEnd = endOfMonth(new Date(selectedYear, selectedMonth));
+    const startDow = getDay(monthStart);
+    const mondayOffset = startDow === 0 ? 6 : startDow - 1;
+    const gridStart = subDays(monthStart, mondayOffset);
+    const daysFromGridStartToMonthEnd =
+      Math.ceil(
+        (monthEnd.getTime() - gridStart.getTime()) / (1000 * 60 * 60 * 24)
+      ) + 1;
+    const weeksNeeded = Math.ceil(daysFromGridStartToMonthEnd / 7);
+    const totalDays = weeksNeeded * 7;
+    const gridEnd = addDays(gridStart, totalDays - 1);
+    return eachDayOfInterval({ start: gridStart, end: gridEnd });
+  }, [selectedMonth, selectedYear]);
+
+  const currentMonthDate = new Date(selectedYear, selectedMonth);
+  const isCurrentMonth =
+    selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
+
+  // Active students
+  const activeStudents = useMemo(
+    () => students.filter((s) => s.active !== false),
+    [students]
+  );
+
+  // Grouped students for summary (same grouping as dialog)
+  const groupedStudents = useMemo(() => {
+    const groups = new Map<string, Student[]>();
+    activeStudents.forEach((s) => {
+      const key = s.school_class || "未分班";
+      const group = groups.get(key) ?? [];
+      group.push(s);
+      groups.set(key, group);
+    });
+    const entries = Array.from(groups.entries()).sort((a, b) => {
+      if (a[0] === "未分班") return 1;
+      if (b[0] === "未分班") return -1;
+      return a[0].localeCompare(b[0], "zh");
+    });
+    entries.forEach(([, group]) => {
+      group.sort((a, b) => a.name.localeCompare(b.name, "zh"));
+    });
+    return entries;
+  }, [activeStudents]);
+
+  // ── Data fetching ──────────────────────────────────────
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     const monthStr = String(selectedMonth + 1).padStart(2, "0");
     const startDate = `${selectedYear}-${monthStr}-01`;
     const endMonth = selectedMonth === 11 ? 1 : selectedMonth + 2;
@@ -78,8 +178,46 @@ export default function AttendancePage() {
       supabase.from("students").select("*").order("name"),
     ]);
 
-    setSessions(sessionsRes.data ?? []);
-    setStudents(studentsRes.data ?? []);
+    const sessionsData = sessionsRes.data ?? [];
+    const studentsData = studentsRes.data ?? [];
+
+    setSessions(sessionsData);
+    setStudents(studentsData);
+
+    // Fetch attendance for all sessions in this month
+    const sessionIds = sessionsData.map((s) => s.id);
+    if (sessionIds.length > 0) {
+      const { data: attendanceData } = await supabase
+        .from("attendance")
+        .select("session_id, student_id, present")
+        .in("session_id", sessionIds)
+        .eq("present", true);
+
+      // Build per-session attendance set (for calendar indicators)
+      const bySession = new Map<string, Set<string>>();
+      // Build per-student attendance count (for summary)
+      const studentCounts = new Map<string, number>();
+
+      (attendanceData ?? []).forEach((a) => {
+        // Per-session
+        const set = bySession.get(a.session_id) ?? new Set();
+        set.add(a.student_id);
+        bySession.set(a.session_id, set);
+
+        // Per-student
+        studentCounts.set(
+          a.student_id,
+          (studentCounts.get(a.student_id) ?? 0) + 1
+        );
+      });
+
+      setAttendanceBySession(bySession);
+      setSummaryAttendance(studentCounts);
+    } else {
+      setAttendanceBySession(new Map());
+      setSummaryAttendance(new Map());
+    }
+
     setLoading(false);
   }, [supabase, selectedMonth, selectedYear]);
 
@@ -87,320 +225,419 @@ export default function AttendancePage() {
     fetchData();
   }, [fetchData]);
 
-  // Load attendance for selected session
-  useEffect(() => {
-    if (!selectedSession) return;
+  // ── Month navigation ──────────────────────────────────
 
-    async function loadAttendance() {
-      const { data } = await supabase
-        .from("attendance")
-        .select("student_id, present, fee_exempt")
-        .eq("session_id", selectedSession);
+  function prevMonth() {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear((y) => y - 1);
+    } else {
+      setSelectedMonth((m) => m - 1);
+    }
+  }
 
-      const map: Record<string, boolean> = {};
-      const exemptMap: Record<string, boolean> = {};
-      activeStudents.forEach((s) => {
-        map[s.id] = false;
-        exemptMap[s.id] = false;
-      });
-      data?.forEach((a) => {
-        map[a.student_id] = a.present ?? false;
-        exemptMap[a.student_id] = a.fee_exempt ?? false;
-      });
-      setAttendance(map);
-      setFeeExempt(exemptMap);
+  function nextMonth() {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear((y) => y + 1);
+    } else {
+      setSelectedMonth((m) => m + 1);
+    }
+  }
+
+  function goToday() {
+    setSelectedMonth(now.getMonth());
+    setSelectedYear(now.getFullYear());
+  }
+
+  // ── Click date → open attendance dialog ────────────────
+
+  async function handleDateClick(date: Date) {
+    const dateStr = format(date, "yyyy-MM-dd");
+    let session = sessionMap.get(dateStr) ?? null;
+
+    if (!session) {
+      // Auto-create session
+      const { data, error } = await supabase
+        .from("class_sessions")
+        .insert({ session_date: dateStr })
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === "23505") {
+          toast.error("该日期已存在");
+        } else {
+          toast.error("创建训练课失败");
+        }
+        return;
+      }
+      session = data;
+      // Refresh data to show new session on calendar
+      await fetchData();
     }
 
-    loadAttendance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSession, students, supabase]);
+    setDialogSession(session);
+    setDialogDate(dateStr);
+    setDialogOpen(true);
+  }
 
-  // Load summary data
-  useEffect(() => {
-    if (tab !== "summary" || sessions.length === 0 || students.length === 0) return;
+  // ── Add single date (for dates in other months) ────────
 
-    async function loadSummary() {
-      const sessionIds = sessions.map((s) => s.id);
-      const { data } = await supabase
-        .from("attendance")
-        .select("student_id, present")
-        .in("session_id", sessionIds)
-        .eq("present", true);
-
-      const counts: Record<string, number> = {};
-      data?.forEach((a) => {
-        counts[a.student_id] = (counts[a.student_id] ?? 0) + 1;
-      });
-
-      setSummaryData(
-        students
-          .filter((s) => s.active !== false)
-          .map((s) => ({
-            student: s,
-            attended: counts[s.id] ?? 0,
-            total: sessions.length,
-          }))
-      );
-    }
-
-    loadSummary();
-  }, [tab, sessions, students, supabase]);
-
-  async function saveAttendance() {
-    if (!selectedSession) return;
-    setSaving(true);
-
-    const records = Object.entries(attendance).map(([studentId, present]) => ({
-      student_id: studentId,
-      session_id: selectedSession,
-      present,
-      fee_exempt: feeExempt[studentId] ?? false,
-    }));
-
-    // Upsert all attendance records
+  async function addSession() {
+    if (!newDate) return;
     const { error } = await supabase
-      .from("attendance")
-      .upsert(records, { onConflict: "student_id,session_id" });
+      .from("class_sessions")
+      .insert({ session_date: newDate });
 
     if (error) {
-      toast.error("保存出勤记录失败");
-      setSaving(false);
+      if (error.code === "23505") {
+        toast.error("该日期已存在");
+      } else {
+        toast.error("添加训练课失败");
+      }
       return;
     }
 
-    toast.success("出勤记录已保存");
-    setSaving(false);
+    toast.success("训练课已添加");
+    setNewDate("");
+    setShowAdd(false);
+    fetchData();
   }
 
-  function toggleAll(checked: boolean) {
-    const updated: Record<string, boolean> = {};
-    activeStudents.forEach((s) => (updated[s.id] = checked));
-    setAttendance(updated);
+  // ── Bulk add sessions ──────────────────────────────────
+
+  async function bulkAddSessions() {
+    const dayOfWeek = parseInt(bulkDay);
+    const start = startOfMonth(new Date(selectedYear, selectedMonth));
+    const end = endOfMonth(new Date(selectedYear, selectedMonth));
+    const allDays = eachDayOfInterval({ start, end });
+    const matchingDays = allDays.filter((d) => getDay(d) === dayOfWeek);
+
+    const dates = matchingDays.map((d) => ({
+      session_date: format(d, "yyyy-MM-dd"),
+    }));
+
+    if (dates.length === 0) {
+      toast.error("没有匹配的日期");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("class_sessions")
+      .upsert(dates, { onConflict: "session_date" });
+
+    if (error) {
+      toast.error("添加训练课失败");
+      return;
+    }
+
+    toast.success(`成功添加 ${dates.length} 节训练课`);
+    setShowBulk(false);
+    fetchData();
   }
 
-  const presentCount = Object.values(attendance).filter(Boolean).length;
+  // ── Toggle group collapse ──────────────────────────────
+
+  function toggleGroup(groupName: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
+  }
+
+  // ── Render ─────────────────────────────────────────────
 
   return (
-    <TooltipProvider>
-      <div>
-        <h1 className="text-2xl font-bold mb-6">出勤</h1>
-
-        <div className="flex gap-3 mb-6">
-          <Select
-            value={String(selectedMonth)}
-            onValueChange={(v) => {
-              setSelectedMonth(Number(v));
-              setSelectedSession("");
-            }}
+    <div>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl font-bold">出勤</h1>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowBulk(true)}
+            variant="outline"
+            size="sm"
           >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((month, idx) => (
-                <SelectItem key={idx} value={String(idx)}>
-                  {month}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <CalendarPlus className="h-4 w-4 mr-2" />
+            批量添加
+          </Button>
+          <Button onClick={() => setShowAdd(true)} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            添加日期
+          </Button>
+        </div>
+      </div>
 
-          <Input
-            type="number"
-            min={2024}
-            max={2030}
-            value={selectedYear}
-            onChange={(e) => {
-              setSelectedYear(Number(e.target.value));
-              setSelectedSession("");
-            }}
-            className="w-[100px]"
-          />
+      {/* Month navigation */}
+      <div className="flex items-center gap-2 mb-4">
+        <Button variant="outline" size="icon" onClick={prevMonth}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <h2 className="text-lg font-semibold min-w-[140px] text-center">
+          {selectedYear}年{MONTHS[selectedMonth]}
+        </h2>
+        <Button variant="outline" size="icon" onClick={nextMonth}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        {!isCurrentMonth && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goToday}
+            className="ml-2"
+          >
+            今天
+          </Button>
+        )}
+        <span className="text-sm text-muted-foreground ml-auto">
+          本月 {sessions.length} 节课
+        </span>
+      </div>
+
+      {/* Calendar grid */}
+      <div className="border rounded-lg overflow-hidden">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 border-b bg-muted/50">
+          {CAL_HEADERS.map((d) => (
+            <div
+              key={d}
+              className="py-2 text-center text-sm font-medium text-muted-foreground"
+            >
+              {d}
+            </div>
+          ))}
         </div>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="take">记录出勤</TabsTrigger>
-            <TabsTrigger value="summary">月度汇总</TabsTrigger>
-          </TabsList>
+        {/* Day cells */}
+        {loading ? (
+          <div className="py-16 text-center text-muted-foreground">
+            加载中...
+          </div>
+        ) : (
+          <div className="grid grid-cols-7">
+            {calendarDays.map((day) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const inMonth = isSameMonth(day, currentMonthDate);
+              const today = isToday(day);
+              const session = sessionMap.get(dateStr);
+              const hasSession = !!session;
+              const hasAttendance =
+                hasSession && sessionsWithAttendance.has(session.id);
 
-          <TabsContent value="take" className="mt-4">
-            {loading ? (
-              <p className="text-muted-foreground">加载中...</p>
-            ) : sessions.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  本月没有训练课。请先添加训练课。
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <div className="mb-4">
-                  <Label className="text-sm font-medium mb-2 block">
-                    选择训练课
-                  </Label>
-                  <Select value={selectedSession} onValueChange={setSelectedSession}>
-                    <SelectTrigger className="w-[300px]">
-                      <SelectValue placeholder="选择日期..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sessions.map((session) => (
-                        <SelectItem key={session.id} value={session.id}>
-                          {format(parseISO(session.session_date), "d MMMM yyyy (EEEE)", {
-                            locale: zhCN,
-                          })}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {selectedSession && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-base">
-                        出勤: {presentCount} / {activeStudents.length}
-                      </CardTitle>
-                      <Button onClick={saveAttendance} disabled={saving} size="sm">
-                        <Save className="h-4 w-4 mr-2" />
-                        {saving ? "保存中..." : "保存"}
-                      </Button>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="mb-3 flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleAll(true)}
-                        >
-                          全选
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleAll(false)}
-                        >
-                          取消全选
-                        </Button>
-                      </div>
-
-                      <div className="space-y-2">
-                        {activeStudents.map((student) => (
-                          <div
-                            key={student.id}
-                            className="flex items-center gap-3 p-2 rounded hover:bg-accent"
-                          >
-                            <Checkbox
-                              checked={attendance[student.id] ?? false}
-                              onCheckedChange={(checked) =>
-                                setAttendance({
-                                  ...attendance,
-                                  [student.id]: checked === true,
-                                })
-                              }
-                            />
-                            <span className="font-medium flex-1">{student.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              {student.school_class}
-                            </span>
-                            {student.health_notes && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex items-center gap-1 text-orange-600">
-                                    <AlertTriangle className="h-4 w-4" />
-                                    <span className="text-xs font-medium">健康注意</span>
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="right" className="max-w-xs">
-                                  <p className="text-sm">{student.health_notes}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                            {attendance[student.id] && (
-                              <Button
-                                variant={feeExempt[student.id] ? "default" : "outline"}
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                                onClick={() =>
-                                  setFeeExempt({
-                                    ...feeExempt,
-                                    [student.id]: !feeExempt[student.id],
-                                  })
-                                }
-                                title={feeExempt[student.id] ? "已豁免费用" : "豁免此次费用"}
-                              >
-                                免
-                              </Button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="summary" className="mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {selectedYear}年{MONTHS[selectedMonth]}汇总
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {summaryData.length === 0 ? (
-                  <p className="text-muted-foreground">暂无出勤数据</p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>学生</TableHead>
-                        <TableHead>班级</TableHead>
-                        <TableHead className="text-center">出勤</TableHead>
-                        <TableHead className="text-center">总课次</TableHead>
-                        <TableHead className="text-center">出勤率 (%)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {summaryData.map(({ student, attended, total }) => (
-                        <TableRow key={student.id}>
-                          <TableCell className="font-medium">
-                            {student.name}
-                            {student.health_notes && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <AlertTriangle className="h-3.5 w-3.5 text-orange-500 inline ml-1" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="text-sm">{student.health_notes}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </TableCell>
-                          <TableCell>{student.school_class ?? "-"}</TableCell>
-                          <TableCell className="text-center">{attended}</TableCell>
-                          <TableCell className="text-center">{total}</TableCell>
-                          <TableCell className="text-center">
-                            {total > 0
-                              ? `${Math.round((attended / total) * 100)}%`
-                              : "-"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => inMonth && handleDateClick(day)}
+                  disabled={!inMonth}
+                  className={`
+                    relative aspect-square flex items-center justify-center
+                    text-sm border-b border-r transition-colors
+                    ${
+                      !inMonth
+                        ? "text-muted-foreground/25 cursor-default bg-muted/20"
+                        : hasAttendance
+                        ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+                        : hasSession
+                        ? "bg-primary/20 text-primary font-semibold hover:bg-primary/30"
+                        : "hover:bg-muted cursor-pointer"
+                    }
+                    ${today && inMonth ? "ring-2 ring-primary ring-inset" : ""}
+                  `}
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </TooltipProvider>
+
+      <p className="text-xs text-muted-foreground mt-3">
+        点击日期记录出勤，再次点击查看/修改出勤记录
+      </p>
+
+      {/* Monthly Summary */}
+      {!loading && sessions.length > 0 && activeStudents.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="text-base">
+              {selectedYear}年{MONTHS[selectedMonth]} 月度汇总
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>学生</TableHead>
+                  <TableHead>班级</TableHead>
+                  <TableHead className="text-center">出勤</TableHead>
+                  <TableHead className="text-center">总课</TableHead>
+                  <TableHead className="text-center">出勤率</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupedStudents.map(([className, group]) => {
+                  const isCollapsed = collapsedGroups.has(className);
+                  return (
+                    <GroupRows
+                      key={className}
+                      className={className}
+                      students={group}
+                      totalSessions={sessions.length}
+                      summaryAttendance={summaryAttendance}
+                      isCollapsed={isCollapsed}
+                      onToggle={() => toggleGroup(className)}
+                    />
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Attendance Dialog */}
+      <AttendanceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        session={dialogSession}
+        sessionDate={dialogDate}
+        students={students}
+        onSaved={() => fetchData()}
+        onDeleted={() => fetchData()}
+      />
+
+      {/* Add single date dialog */}
+      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>添加训练日期</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>日期</Label>
+              <Input
+                type="date"
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowAdd(false)}>
+                取消
+              </Button>
+              <Button onClick={addSession} disabled={!newDate}>
+                添加
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk add dialog */}
+      <Dialog open={showBulk} onOpenChange={setShowBulk}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>批量添加训练课</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              添加 {selectedYear}年{MONTHS[selectedMonth]}的所有指定星期
+            </p>
+            <div className="space-y-2">
+              <Label>星期</Label>
+              <Select value={bulkDay} onValueChange={setBulkDay}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAYS_OF_WEEK.map((day, idx) => (
+                    <SelectItem key={idx} value={String(idx)}>
+                      {day}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowBulk(false)}>
+                取消
+              </Button>
+              <Button onClick={bulkAddSessions}>添加</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
-function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement> & { className?: string }) {
-  return <label className={className} {...props} />;
+// ── Summary group rows component ─────────────────────────
+
+function GroupRows({
+  className,
+  students,
+  totalSessions,
+  summaryAttendance,
+  isCollapsed,
+  onToggle,
+}: {
+  className: string;
+  students: Student[];
+  totalSessions: number;
+  summaryAttendance: Map<string, number>;
+  isCollapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      {/* Group header row */}
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={onToggle}
+      >
+        <TableCell colSpan={5} className="py-2">
+          <div className="flex items-center gap-1 text-sm font-semibold">
+            {isCollapsed ? (
+              <ChevronRightIcon className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+            {className}（{students.length}人）
+          </div>
+        </TableCell>
+      </TableRow>
+
+      {/* Student rows */}
+      {!isCollapsed &&
+        students.map((student) => {
+          const attended = summaryAttendance.get(student.id) ?? 0;
+          const rate =
+            totalSessions > 0
+              ? Math.round((attended / totalSessions) * 100)
+              : 0;
+          return (
+            <TableRow key={student.id}>
+              <TableCell className="pl-8 font-medium">
+                {student.name}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {student.school_class ?? "-"}
+              </TableCell>
+              <TableCell className="text-center">{attended}</TableCell>
+              <TableCell className="text-center">{totalSessions}</TableCell>
+              <TableCell className="text-center">
+                {totalSessions > 0 ? `${rate}%` : "-"}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+    </>
+  );
 }
