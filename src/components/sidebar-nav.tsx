@@ -13,6 +13,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/dashboard/attendance", label: "出勤", icon: ClipboardCheck },
   { href: "/dashboard/fees", label: "费用", icon: DollarSign },
   { href: "/dashboard/receipts", label: "收据", icon: Receipt },
+  { href: "/dashboard/coaches", label: "教练", icon: UserCog },
 ];
 
 const STORAGE_KEY = "sidebar-collapsed";

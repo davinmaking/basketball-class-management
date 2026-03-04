@@ -33,7 +33,9 @@ import { Trash2, AlertTriangle } from "lucide-react";
 import { DAYS_OF_WEEK } from "@/lib/constants";
 import { groupStudentsByClass } from "@/lib/student-groups";
 
-type Session = Tables<"class_sessions">;
+type Session = Tables<"class_sessions"> & {
+  coach?: { name: string } | null;
+};
 type Student = Tables<"students">;
 
 interface AttendanceDialogProps {
@@ -42,6 +44,7 @@ interface AttendanceDialogProps {
   session: Session | null;
   sessionDate: string; // "yyyy-MM-dd"
   students: Student[];
+  coachName?: string | null;
   onSaved: () => void;
   onDeleted: () => void;
 }
@@ -52,6 +55,7 @@ export function AttendanceDialog({
   session,
   sessionDate,
   students,
+  coachName,
   onSaved,
   onDeleted,
 }: AttendanceDialogProps) {
@@ -201,7 +205,7 @@ export function AttendanceDialog({
   // Format the dialog title
   const dateObj = parseISO(sessionDate);
   const dayOfWeek = DAYS_OF_WEEK[getDay(dateObj)];
-  const titleText = `${sessionDate}（${dayOfWeek}）`;
+  const titleText = `${sessionDate}（${dayOfWeek}）${coachName ? ` · ${coachName}` : ""}`;
 
   return (
     <>

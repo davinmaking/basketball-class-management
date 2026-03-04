@@ -86,30 +86,66 @@ export type Database = {
           },
         ]
       }
+      coaches: {
+        Row: {
+          active: boolean
+          created_at: string | null
+          id: string
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
       class_sessions: {
         Row: {
+          coach_id: string | null
           created_at: string | null
           id: string
           notes: string | null
           session_date: string
         }
         Insert: {
+          coach_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
           session_date: string
         }
         Update: {
+          coach_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
           session_date?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "class_sessions_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
           amount: number
+          coach_id: string | null
           created_at: string | null
           id: string
           month: number
@@ -123,6 +159,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          coach_id?: string | null
           created_at?: string | null
           id?: string
           month: number
@@ -136,6 +173,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          coach_id?: string | null
           created_at?: string | null
           id?: string
           month?: number
@@ -149,6 +187,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "payments_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payments_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
@@ -160,6 +205,7 @@ export type Database = {
       refunds: {
         Row: {
           amount: number
+          coach_id: string | null
           created_at: string | null
           id: string
           month: number | null
@@ -176,6 +222,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          coach_id?: string | null
           created_at?: string | null
           id?: string
           month?: number | null
@@ -192,6 +239,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          coach_id?: string | null
           created_at?: string | null
           id?: string
           month?: number | null
@@ -207,6 +255,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "refunds_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "refunds_student_id_fkey"
             columns: ["student_id"]

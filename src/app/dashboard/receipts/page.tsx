@@ -50,6 +50,7 @@ interface ReceiptRow {
   notes: string | null;
   voided: boolean;
   payment_voided: boolean;
+  coach_name: string | null;
 }
 
 interface CreditNoteRow {
@@ -69,6 +70,7 @@ interface CreditNoteRow {
   refund_voided: boolean;
   student_name: string;
   school_class: string | null;
+  coach_name: string | null;
 }
 
 export default function ReceiptsPage() {
@@ -102,7 +104,8 @@ export default function ReceiptsPage() {
           year,
           notes,
           voided,
-          student:students!inner(name, school_class)
+          student:students!inner(name, school_class),
+          coach:coaches(name)
         )
       `
       )
@@ -128,6 +131,7 @@ export default function ReceiptsPage() {
       notes: r.payment.notes,
       voided: r.voided ?? false,
       payment_voided: r.payment.voided ?? false,
+      coach_name: r.payment.coach?.name ?? null,
     }));
 
     setReceipts(rows);
@@ -156,7 +160,8 @@ export default function ReceiptsPage() {
           total_due,
           notes,
           voided,
-          student:students!inner(name, school_class)
+          student:students!inner(name, school_class),
+          coach:coaches(name)
         )
       `
       )
@@ -185,6 +190,7 @@ export default function ReceiptsPage() {
       refund_voided: cn.refund.voided ?? false,
       student_name: cn.refund.student.name,
       school_class: cn.refund.student.school_class ?? null,
+      coach_name: cn.refund.coach?.name ?? null,
     }));
 
     setCreditNotes(rows);
@@ -334,6 +340,7 @@ export default function ReceiptsPage() {
                     <TableHead>学生</TableHead>
                     <TableHead>期间</TableHead>
                     <TableHead className="text-right">金额</TableHead>
+                    <TableHead>教练</TableHead>
                     <TableHead>日期</TableHead>
                     <TableHead className="text-right">操作</TableHead>
                   </TableRow>
@@ -341,13 +348,13 @@ export default function ReceiptsPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         加载中...
                       </TableCell>
                     </TableRow>
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         {search ? "未找到收据" : "暂无收据"}
                       </TableCell>
                     </TableRow>
@@ -368,6 +375,9 @@ export default function ReceiptsPage() {
                           </TableCell>
                           <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
                             {APP_CONFIG.currency} {Number(receipt.amount).toFixed(2)}
+                          </TableCell>
+                          <TableCell className={isVoided ? "line-through" : ""}>
+                            {receipt.coach_name ?? "-"}
                           </TableCell>
                           <TableCell className={isVoided ? "line-through" : ""}>
                             {receipt.issued_at
@@ -433,6 +443,7 @@ export default function ReceiptsPage() {
                     <TableHead>学生</TableHead>
                     <TableHead>期间</TableHead>
                     <TableHead className="text-right">金额</TableHead>
+                    <TableHead>教练</TableHead>
                     <TableHead>日期</TableHead>
                     <TableHead className="text-right">操作</TableHead>
                   </TableRow>
@@ -440,13 +451,13 @@ export default function ReceiptsPage() {
                 <TableBody>
                   {cnLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         加载中...
                       </TableCell>
                     </TableRow>
                   ) : filteredCN.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         {cnSearch ? "未找到退费单" : "暂无退费单"}
                       </TableCell>
                     </TableRow>
@@ -467,6 +478,9 @@ export default function ReceiptsPage() {
                           </TableCell>
                           <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
                             {APP_CONFIG.currency} {Number(cn.amount).toFixed(2)}
+                          </TableCell>
+                          <TableCell className={isVoided ? "line-through" : ""}>
+                            {cn.coach_name ?? "-"}
                           </TableCell>
                           <TableCell className={isVoided ? "line-through" : ""}>
                             {cn.issued_at

@@ -49,6 +49,7 @@ import { APP_CONFIG } from "@/lib/config";
 import { getLanguageLabel } from "@/lib/language";
 
 type Student = Tables<"students">;
+type Coach = Tables<"coaches">;
 
 interface HistoryPayment {
   id: string;
@@ -61,6 +62,7 @@ interface HistoryPayment {
   voided_at: string | null;
   voided_reason: string | null;
   receipts: { receipt_number: string; voided: boolean }[];
+  coach: { name: string } | null;
 }
 
 interface HistoryRefund {
@@ -74,6 +76,7 @@ interface HistoryRefund {
   voided_at: string | null;
   voided_reason: string | null;
   credit_notes: { credit_note_number: string; voided: boolean }[];
+  coach: { name: string } | null;
 }
 
 interface RefundCalc {
@@ -136,6 +139,10 @@ export default function FeesPage() {
     new Date().toISOString().split("T")[0]
   );
   const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentCoachId, setPaymentCoachId] = useState("");
+
+  // Coaches
+  const [coaches, setCoaches] = useState<Coach[]>([]);
 
   // History + void dialog state
   const [historyStudent, setHistoryStudent] = useState<Student | null>(null);
@@ -159,6 +166,7 @@ export default function FeesPage() {
   );
   const [refundCalc, setRefundCalc] = useState<RefundCalc | null>(null);
   const [savingRefund, setSavingRefund] = useState(false);
+  const [refundCoachId, setRefundCoachId] = useState("");
   const [refundPeriodType, setRefundPeriodType] = useState<"month" | "year">("year");
   const [loadingRefundCalc, setLoadingRefundCalc] = useState(false);
 
@@ -245,15 +253,26 @@ export default function FeesPage() {
     setLoading(false);
   }, [supabase, selectedMonth, selectedYear]);
 
+  const fetchCoaches = useCallback(async () => {
+    const { data } = await supabase
+      .from("coaches")
+      .select("*")
+      .eq("active", true)
+      .order("name");
+    setCoaches(data ?? []);
+  }, [supabase]);
+
   useEffect(() => {
     fetchFees();
-  }, [fetchFees]);
+    fetchCoaches();
+  }, [fetchFees, fetchCoaches]);
 
   function openPaymentDialog(student: Student, suggestedAmount: number) {
     setPaymentStudent(student);
     setPaymentAmount(suggestedAmount > 0 ? String(suggestedAmount) : "");
     setPaymentNotes("");
     setPaymentDate(new Date().toISOString().split("T")[0]);
+    setPaymentCoachId("");
     setShowPayment(true);
   }
 
@@ -278,6 +297,7 @@ export default function FeesPage() {
         month,
         year: selectedYear,
         notes: paymentNotes.trim() || null,
+        coach_id: paymentCoachId && paymentCoachId !== "none" ? paymentCoachId : null,
       })
       .select()
       .single();
@@ -341,6 +361,7 @@ export default function FeesPage() {
     setRefundAmount("");
     setRefundNotes("");
     setRefundDate(new Date().toISOString().split("T")[0]);
+    setRefundCoachId("");
     setRefundCalc(null);
     setRefundPeriodType("year");
     setShowRefund(true);
@@ -476,6 +497,7 @@ export default function FeesPage() {
         total_sessions: refundCalc.totalSessions,
         total_due: refundCalc.totalDue,
         notes: refundNotes.trim() || null,
+        coach_id: refundCoachId && refundCoachId !== "none" ? refundCoachId : null,
       })
       .select()
       .single();
@@ -544,14 +566,14 @@ export default function FeesPage() {
     const [paymentsData, refundsData] = await Promise.all([
       supabase
         .from("payments")
-        .select("*, receipts(receipt_number, voided)")
+        .select("*, receipts(receipt_number, voided), coach:coaches(name)")
         .eq("student_id", student.id)
         .eq("month", month)
         .eq("year", selectedYear)
         .order("payment_date", { ascending: false }),
       supabase
         .from("refunds")
-        .select("*, credit_notes(credit_note_number, voided)")
+        .select("*, credit_notes(credit_note_number, voided), coach:coaches(name)")
         .eq("student_id", student.id)
         .eq("year", selectedYear)
         .order("refund_date", { ascending: false }),
@@ -906,6 +928,9 @@ export default function FeesPage() {
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
                           {format(parseISO(payment.payment_date), "dd/MM/yyyy")}
+                          {payment.coach?.name && (
+                            <span className="ml-2">教练: {payment.coach.name}</span>
+                          )}
                           {receipt && (
                             <span className="ml-2">
                               收据: {receipt.receipt_number}
@@ -980,6 +1005,9 @@ export default function FeesPage() {
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
                           {format(parseISO(refund.refund_date), "dd/MM/yyyy")}
+                          {refund.coach?.name && (
+                            <span className="ml-2">教练: {refund.coach.name}</span>
+                          )}
                           <span className="ml-2">期间: {periodLabel}</span>
                           {cn && (
                             <span className="ml-2">
@@ -1153,6 +1181,24 @@ export default function FeesPage() {
                 onChange={(e) => setRefundNotes(e.target.value)}
               />
             </div>
+            {coaches.length > 0 && (
+              <div className="space-y-2">
+                <Label>负责教练</Label>
+                <Select value={refundCoachId} onValueChange={setRefundCoachId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择教练（可选）" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">不选择</SelectItem>
+                    {coaches.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowRefund(false)}>
                 取消
@@ -1273,6 +1319,24 @@ export default function FeesPage() {
                 onChange={(e) => setPaymentNotes(e.target.value)}
               />
             </div>
+            {coaches.length > 0 && (
+              <div className="space-y-2">
+                <Label>负责教练</Label>
+                <Select value={paymentCoachId} onValueChange={setPaymentCoachId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择教练（可选）" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">不选择</SelectItem>
+                    {coaches.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowPayment(false)}>
                 取消

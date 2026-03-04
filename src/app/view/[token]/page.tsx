@@ -80,7 +80,7 @@ export default async function ParentViewPage({
   // Get payments
   const { data: payments } = await supabase
     .from("payments")
-    .select("*")
+    .select("*, coach:coaches(name)")
     .eq("student_id", student.id)
     .eq("year", displayYear)
     .order("payment_date", { ascending: false });
@@ -104,7 +104,8 @@ export default async function ParentViewPage({
     .select(
       `
       *,
-      credit_notes(credit_note_number, voided, issued_at)
+      credit_notes(credit_note_number, voided, issued_at),
+      coach:coaches(name)
     `
     )
     .eq("student_id", student.id)
@@ -318,11 +319,12 @@ export default async function ParentViewPage({
                     <TableHead>日期</TableHead>
                     <TableHead>期间</TableHead>
                     <TableHead className="text-right">金额</TableHead>
+                    <TableHead>教练</TableHead>
                     <TableHead className="text-right">收据</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(payments ?? []).map((payment) => {
+                  {(payments ?? []).map((payment: any) => {
                     const receipt = receiptMap.get(payment.id);
                     const isVoided = payment.voided;
                     return (
@@ -338,6 +340,9 @@ export default async function ParentViewPage({
                         </TableCell>
                         <TableCell className={`text-right font-medium ${isVoided ? "line-through" : ""}`}>
                           {APP_CONFIG.currency} {Number(payment.amount).toFixed(2)}
+                        </TableCell>
+                        <TableCell className={isVoided ? "line-through" : ""}>
+                          {payment.coach?.name ?? "-"}
                         </TableCell>
                         <TableCell className="text-right">
                           {receipt && !isVoided && (
@@ -375,11 +380,12 @@ export default async function ParentViewPage({
                     <TableHead>日期</TableHead>
                     <TableHead>期间</TableHead>
                     <TableHead className="text-right">金额</TableHead>
+                    <TableHead>教练</TableHead>
                     <TableHead className="text-right">退费单</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(refunds ?? []).map((refund) => {
+                  {(refunds ?? []).map((refund: any) => {
                     const creditNote = (refund.credit_notes as any[])?.[0];
                     return (
                       <TableRow key={refund.id}>
@@ -393,6 +399,9 @@ export default async function ParentViewPage({
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {APP_CONFIG.currency} {Number(refund.amount).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          {refund.coach?.name ?? "-"}
                         </TableCell>
                         <TableCell className="text-right">
                           {creditNote && !creditNote.voided && (
