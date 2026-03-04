@@ -312,10 +312,11 @@ export default function FeesPage() {
     let receiptNumber = "";
     const maxRetries = 3;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const monthStr = String(month).padStart(2, "0");
       const { data: lastReceipt } = await supabase
         .from("receipts")
         .select("receipt_number")
-        .like("receipt_number", `${APP_CONFIG.receiptPrefix}-${selectedYear}-%`)
+        .like("receipt_number", `${APP_CONFIG.receiptPrefix}-${selectedYear}-${monthStr}-%`)
         .order("receipt_number", { ascending: false })
         .limit(1)
         .single();
@@ -326,7 +327,7 @@ export default function FeesPage() {
         nextNum = parseInt(parts[parts.length - 1]) + 1;
       }
 
-      receiptNumber = `${APP_CONFIG.receiptPrefix}-${selectedYear}-${String(nextNum).padStart(3, "0")}`;
+      receiptNumber = `${APP_CONFIG.receiptPrefix}-${selectedYear}-${monthStr}-${String(nextNum).padStart(3, "0")}`;
 
       const { error: receiptError } = await supabase.from("receipts").insert({
         payment_id: paymentData.id,
