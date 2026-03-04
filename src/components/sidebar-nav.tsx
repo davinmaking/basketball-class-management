@@ -66,7 +66,7 @@ export function SidebarNav() {
   return (
     <TooltipProvider>
       {/* Mobile header */}
-      <div className="md:hidden flex items-center justify-between p-4 border-b bg-background sticky top-0 z-50">
+      <div className="md:hidden flex items-center justify-between px-4 h-14 border-b bg-background sticky top-0 z-50">
         <h1 className="font-bold text-lg">{APP_CONFIG.appName}</h1>
         <Button
           variant="ghost"
@@ -84,7 +84,7 @@ export function SidebarNav() {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black/50 z-40"
+          className="md:hidden fixed inset-0 top-14 bg-black/50 z-40"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -92,7 +92,7 @@ export function SidebarNav() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 h-full w-64 bg-background border-r flex flex-col transition-transform duration-200",
+          "fixed top-14 left-0 z-40 h-[calc(100vh-3.5rem)] w-64 bg-background border-r flex flex-col transition-transform duration-200",
           "md:sticky md:top-0 md:h-screen md:translate-x-0 md:z-auto md:transition-[width] md:duration-200 md:shrink-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           collapsed ? "md:w-16" : "md:w-64"
