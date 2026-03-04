@@ -92,7 +92,7 @@ export function SidebarNav() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-14 left-0 z-40 h-[calc(100vh-3.5rem)] w-64 bg-background border-r flex flex-col transition-transform duration-200",
+          "fixed top-14 bottom-0 left-0 z-40 w-64 bg-background border-r flex flex-col transition-transform duration-200",
           "md:sticky md:top-0 md:h-screen md:translate-x-0 md:z-auto md:transition-[width] md:duration-200 md:shrink-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           collapsed ? "md:w-16" : "md:w-64"
