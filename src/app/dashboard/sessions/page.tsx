@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Trash2, CalendarPlus } from "lucide-react";
 import { format, parseISO, getDay, addDays, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
-import { ms } from "date-fns/locale";
+import { zhCN } from "date-fns/locale";
 import { toast } from "sonner";
 
 type Session = Tables<"class_sessions">;
@@ -214,7 +214,7 @@ export default function SessionsPage() {
                   >
                     <div>
                       <span className="font-medium">
-                        {format(date, "d MMMM yyyy (EEEE)", { locale: ms })}
+                        {format(date, "d MMMM yyyy (EEEE)", { locale: zhCN })}
                       </span>
                       {session.notes && (
                         <span className="text-sm text-muted-foreground ml-2">
