@@ -30,12 +30,13 @@ Basketball training class management web app for coaches and parents.
 - Coach tracking: each session supports multiple coaches via `session_coaches` join table; coaches managed in settings
 - Parent portal: `/view/[token]?year=YYYY` — no auth required, read-only, supports year navigation
 - CSV import auto-maps columns by keyword matching (Malay + English), includes duplicate name detection
+- Dashboard outstanding = all-time cumulative (not current month only) — students may pay late across months
 - Session deletion blocked when month has non-voided payments
 - All destructive actions (delete payments, receipts, sessions) require confirmation dialog
 
 ## Architecture
 - `/src/app/login/` — Auth (login + signup)
-- `/src/app/dashboard/` — Protected coach area (students, sessions, attendance, fees, receipts, reports)
+- `/src/app/dashboard/` — Protected coach area (students, sessions, attendance, fees, receipts, reports); dashboard page shows stat cards + all-time outstanding students grouped by class
 - `/src/app/view/[token]/` — Public parent portal (server component)
 - `/src/lib/config.ts` — Environment-based configuration (app name, school info, fee rate, currency)
 - `/src/lib/supabase/` — client.ts, server.ts, middleware.ts
@@ -58,6 +59,7 @@ Basketball training class management web app for coaches and parents.
 - Sidebar active state uses soft highlight (`bg-primary/10 text-primary`) not solid fill
 - Finance and Reports tabs use `variant="line"` (underline style)
 - Stat card values use `tabular-nums tracking-tight` for clean number display
+- Student lists grouped by class use `groupStudentsByClass()` with class header rows (`bg-muted/50`, `colSpan` full width)
 - Page headings use `tracking-tight` for tighter typography
 - Login and parent portal use `min-h-[100dvh]` (not `min-h-screen`) with Dribbble brand icon
 
