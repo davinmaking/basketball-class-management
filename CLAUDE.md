@@ -13,7 +13,8 @@ Basketball training class management web app for coaches and parents.
 ## Database Schema
 - `students` — name, school_class, parent_name, relationship, phone, health_notes, fee_exempt, preferred_language, active, view_token, registered_at
 - `coaches` — name, phone, active
-- `class_sessions` — session_date (unique), coach_id (FK→coaches), notes
+- `class_sessions` — session_date (unique), notes
+- `session_coaches` — session_id (FK→class_sessions), coach_id (FK→coaches) (unique on session+coach) — many-to-many join table
 - `attendance` — student_id, session_id, present, fee_exempt (unique on student+session)
 - `payments` — student_id, amount, payment_date, month, year, notes, voided, voided_at, voided_reason
 - `refunds` — student_id, coach_id, amount, refund_date, month (nullable), year, total_sessions, total_due, total_paid, notes, voided, voided_at, voided_reason
@@ -26,7 +27,7 @@ Basketball training class management web app for coaches and parents.
 - Fee-exempt: controlled per-student (`students.fee_exempt`), used as default for attendance `fee_exempt` toggle
 - Receipt number format: `{prefix}-{year}-{month}-{sequential}` (e.g. `SJKT-KLBK-2026-03-001`), generated with month-scoped query + retry on unique constraint (error 23505)
 - Receipt format: bilingual (BM + Chinese) school format with signature line and stamp area
-- Coach tracking: each session has optional coach assignment; coaches managed in settings
+- Coach tracking: each session supports multiple coaches via `session_coaches` join table; coaches managed in settings
 - Parent portal: `/view/[token]?year=YYYY` — no auth required, read-only, supports year navigation
 - CSV import auto-maps columns by keyword matching (Malay + English), includes duplicate name detection
 - Session deletion blocked when month has non-voided payments
@@ -45,7 +46,20 @@ Basketball training class management web app for coaches and parents.
 - `/src/lib/phone.ts` — `normalizePhone()` for sibling detection
 - `/src/lib/language.ts` — `detectLanguage()`, `getLanguageLabel()` for WhatsApp message language
 - `/src/components/sidebar-nav.tsx` — Dashboard navigation (collapsible)
+- `/src/components/ui/skeleton.tsx` — Reusable skeleton loader component
+- `/src/app/dashboard/loading.tsx` — Dashboard loading boundary (skeleton stat cards)
 - `/src/middleware.ts` — Auth route protection
+
+## UI/Design Conventions
+- Theme uses `--success` / `--success-foreground` CSS variables (emerald green) for positive states
+- All buttons have `active:scale-[0.98]` tactile feedback via button.tsx CVA base class
+- Loading states use Skeleton components (not plain text "加载中...")
+- Empty states use composed layout: icon in rounded bg + heading + subtext + optional CTA button
+- Sidebar active state uses soft highlight (`bg-primary/10 text-primary`) not solid fill
+- Finance and Reports tabs use `variant="line"` (underline style)
+- Stat card values use `tabular-nums tracking-tight` for clean number display
+- Page headings use `tracking-tight` for tighter typography
+- Login and parent portal use `min-h-[100dvh]` (not `min-h-screen`) with Dribbble brand icon
 
 ## Conventions
 - Date format in UI: `{year}年{month}月` (Chinese style)
