@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Users, Calendar, ClipboardCheck, DollarSign, Undo2, Banknote } from "lucide-react";
 import { APP_CONFIG } from "@/lib/config";
+import { groupStudentsByClass } from "@/lib/student-groups";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -100,21 +102,16 @@ export default async function DashboardPage() {
     allPaymentSums[p.student_id] = (allPaymentSums[p.student_id] ?? 0) + Number(p.amount);
   });
 
-  // Outstanding students: balance < 0, sorted by class then name
+  // Outstanding students: balance < 0, grouped by class
   const outstandingStudents = students
     .map((s) => {
       const due = (allChargeableCounts[s.id] ?? 0) * APP_CONFIG.feePerSession;
       const paid = allPaymentSums[s.id] ?? 0;
       return { ...s, due, paid, balance: paid - due };
     })
-    .filter((s) => s.balance < 0)
-    .sort((a, b) => {
-      const classA = a.school_class || "\uffff";
-      const classB = b.school_class || "\uffff";
-      const classCompare = classA.localeCompare(classB, "zh");
-      if (classCompare !== 0) return classCompare;
-      return a.name.localeCompare(b.name, "zh");
-    });
+    .filter((s) => s.balance < 0);
+
+  const outstandingGroups = groupStudentsByClass(outstandingStudents);
 
   const stats: {
     title: string;
@@ -201,27 +198,36 @@ export default async function DashboardPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>姓名</TableHead>
-                  <TableHead>班级</TableHead>
                   <TableHead className="text-right">应缴</TableHead>
                   <TableHead className="text-right">已付</TableHead>
                   <TableHead className="text-right">欠费</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {outstandingStudents.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{s.school_class || "-"}</TableCell>
-                    <TableCell className="text-right tabular-nums whitespace-nowrap">
-                      {APP_CONFIG.currency} {s.due.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums whitespace-nowrap">
-                      {APP_CONFIG.currency} {s.paid.toFixed(2)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums whitespace-nowrap text-destructive font-medium">
-                      {APP_CONFIG.currency} {s.balance.toFixed(2)}
-                    </TableCell>
-                  </TableRow>
+                {outstandingGroups.map(([className, groupStudents]) => (
+                  <Fragment key={className}>
+                    <TableRow className="bg-muted/50">
+                      <TableCell colSpan={4} className="py-1.5">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          {className}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                    {groupStudents.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="font-medium">{s.name}</TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">
+                          {APP_CONFIG.currency} {s.due.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap">
+                          {APP_CONFIG.currency} {s.paid.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums whitespace-nowrap text-destructive font-medium">
+                          {APP_CONFIG.currency} {s.balance.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
