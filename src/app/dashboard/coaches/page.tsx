@@ -32,7 +32,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, UserCog } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Coach = Tables<"coaches">;
@@ -173,7 +175,7 @@ export default function CoachesPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">教练</h1>
+        <h1 className="text-2xl font-bold tracking-tight">教练</h1>
         <Button onClick={openAdd} size="sm">
           <Plus className="h-4 w-4 mr-2" />
           添加教练
@@ -192,21 +194,30 @@ export default function CoachesPage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  加载中...
-                </TableCell>
-              </TableRow>
+              Array.from({ length: 3 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="text-center"><Skeleton className="h-5 w-10 mx-auto rounded-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-16 ml-auto" /></TableCell>
+                </TableRow>
+              ))
             ) : coaches.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  还没有教练。添加第一位教练吧！
+                <TableCell colSpan={4} className="py-12">
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <div className="rounded-full bg-muted p-3">
+                      <UserCog className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">还没有教练</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">添加第一位教练来开始管理</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={openAdd}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      添加教练
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -220,7 +231,10 @@ export default function CoachesPage() {
                   <TableCell className="text-center">
                     <Badge
                       variant={coach.active ? "default" : "destructive"}
-                      className="cursor-pointer"
+                      className={cn(
+                        "cursor-pointer",
+                        coach.active && "bg-success text-success-foreground hover:bg-success/90"
+                      )}
                       onClick={() => toggleActive(coach)}
                     >
                       {coach.active ? "活跃" : "停用"}

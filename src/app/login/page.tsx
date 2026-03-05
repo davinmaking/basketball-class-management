@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dribbble } from "lucide-react";
 import { APP_CONFIG } from "@/lib/config";
 
 export default function LoginPage() {
@@ -59,10 +60,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
+    <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-muted/30">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">{APP_CONFIG.appName}</CardTitle>
+        <CardHeader className="text-center space-y-2">
+          <div className="mx-auto rounded-full bg-primary/10 p-3 w-fit">
+            <Dribbble className="h-6 w-6 text-primary" />
+          </div>
+          <CardTitle className="text-2xl tracking-tight">{APP_CONFIG.appName}</CardTitle>
           <CardDescription>
             {isSignUp
               ? "注册新教练账号"

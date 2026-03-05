@@ -37,6 +37,7 @@ import {
   ChevronDown,
   ChevronRight as ChevronRightIcon,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   format,
   startOfMonth,
@@ -418,7 +419,7 @@ export default function AttendancePage() {
     <div>
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold">出勤</h1>
+        <h1 className="text-2xl font-bold tracking-tight">出勤</h1>
         <div className="flex gap-2">
           <Button
             onClick={() => setShowBulk(true)}
@@ -479,8 +480,12 @@ export default function AttendancePage() {
 
             {/* Day cells */}
             {loading ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">
-                加载中...
+              <div className="grid grid-cols-7 gap-px">
+                {Array.from({ length: 35 }).map((_, i) => (
+                  <div key={i} className="aspect-square p-1">
+                    <Skeleton className="h-full w-full rounded" />
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="grid grid-cols-7">

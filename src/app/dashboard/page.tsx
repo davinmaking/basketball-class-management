@@ -94,7 +94,7 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">仪表盘</h1>
+      <h1 className="text-2xl font-bold tracking-tight mb-6">仪表盘</h1>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.title}>
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
               <stat.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-bold tracking-tight tabular-nums">{stat.value}</div>
               <p className="text-xs text-muted-foreground">
                 {stat.description}
               </p>

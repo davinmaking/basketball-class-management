@@ -8,9 +8,9 @@ import { AnnualReport } from "./annual-report";
 export default function ReportsPage() {
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">报表</h1>
+      <h1 className="text-2xl font-bold tracking-tight mb-6">报表</h1>
       <Tabs defaultValue="student">
-        <TabsList className="mb-4 flex flex-wrap h-auto gap-1">
+        <TabsList variant="line" className="mb-4 flex flex-wrap h-auto">
           <TabsTrigger value="student">学生报表</TabsTrigger>
           <TabsTrigger value="monthly">月度报表</TabsTrigger>
           <TabsTrigger value="annual">年度报表</TabsTrigger>

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Dribbble } from "lucide-react";
 import { ParentReceiptButton } from "./receipt-button";
 import { ParentCreditNoteButton } from "./credit-note-button";
 import { APP_CONFIG } from "@/lib/config";
@@ -153,11 +153,14 @@ export default async function ParentViewPage({
   const totalPaid = monthlySummaries.reduce((s, m) => s + m.paid, 0);
 
   return (
-    <div className="min-h-screen bg-muted/30 p-4 md:p-8">
+    <div className="min-h-[100dvh] bg-muted/30 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">{APP_CONFIG.className}</h1>
-          <p className="text-muted-foreground">家长门户</p>
+        <div className="text-center space-y-2">
+          <div className="mx-auto rounded-full bg-primary/10 p-3 w-fit">
+            <Dribbble className="h-6 w-6 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">{APP_CONFIG.className}</h1>
+          <p className="text-sm text-muted-foreground">家长门户</p>
         </div>
 
         {/* Student Info */}
@@ -207,7 +210,7 @@ export default async function ParentViewPage({
               <CardTitle className="text-sm">{displayYear}年总费用</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{APP_CONFIG.currency} {totalDue.toFixed(2)}</div>
+              <div className="text-2xl font-bold tracking-tight tabular-nums">{APP_CONFIG.currency} {totalDue.toFixed(2)}</div>
             </CardContent>
           </Card>
           <Card>
@@ -215,7 +218,7 @@ export default async function ParentViewPage({
               <CardTitle className="text-sm">已支付</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{APP_CONFIG.currency} {totalPaid.toFixed(2)}</div>
+              <div className="text-2xl font-bold tracking-tight tabular-nums">{APP_CONFIG.currency} {totalPaid.toFixed(2)}</div>
             </CardContent>
           </Card>
           {totalRefunded > 0 && (
@@ -224,7 +227,7 @@ export default async function ParentViewPage({
                 <CardTitle className="text-sm">已退费</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-2xl font-bold tracking-tight tabular-nums text-blue-600">
                   {APP_CONFIG.currency} {totalRefunded.toFixed(2)}
                 </div>
               </CardContent>
@@ -236,8 +239,8 @@ export default async function ParentViewPage({
             </CardHeader>
             <CardContent>
               <div
-                className={`text-2xl font-bold ${
-                  totalPaid - totalDue - totalRefunded >= 0 ? "text-green-600" : "text-destructive"
+                className={`text-2xl font-bold tracking-tight tabular-nums ${
+                  totalPaid - totalDue - totalRefunded >= 0 ? "text-success" : "text-destructive"
                 }`}
               >
                 {APP_CONFIG.currency} {(totalPaid - totalDue - totalRefunded).toFixed(2)}
@@ -289,7 +292,7 @@ export default async function ParentViewPage({
                         <span
                           className={
                             m.balance > 0
-                              ? "text-green-600"
+                              ? "text-success"
                               : m.balance < 0
                               ? "text-destructive"
                               : ""

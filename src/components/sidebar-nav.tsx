@@ -14,6 +14,7 @@ import {
   PanelLeftOpen,
   UserCog,
   BarChart3,
+  Dribbble,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -106,7 +107,7 @@ export function SidebarNav() {
           )}
         >
           {collapsed ? (
-            <span className="text-lg font-bold">🏀</span>
+            <Dribbble className="h-5 w-5" />
           ) : (
             <div className="min-w-0">
               <h1 className="font-bold text-lg truncate">{APP_CONFIG.appName}</h1>
@@ -135,7 +136,7 @@ export function SidebarNav() {
                     ? "justify-center p-2.5"
                     : "gap-3 px-3 py-2",
                   isActive
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary/10 text-primary font-medium"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >
