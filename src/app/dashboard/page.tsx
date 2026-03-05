@@ -1,5 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Users, Calendar, ClipboardCheck, DollarSign, Undo2, Banknote } from "lucide-react";
 import { APP_CONFIG } from "@/lib/config";
 
@@ -19,28 +28,28 @@ export default async function DashboardPage() {
 
   const [studentsResult, sessionsResult, attendanceResult, chargeableResult, paymentsResult, refundsResult] =
     await Promise.all([
-      supabase.from("students").select("id", { count: "exact", head: true }).eq("active", true),
+      supabase.from("students").select("id, name, school_class").eq("active", true).order("name"),
       supabase
         .from("class_sessions")
-        .select("id", { count: "exact", head: true })
+        .select("id")
         .gte("session_date", monthStart)
         .lt("session_date", monthEnd),
       supabase
         .from("attendance")
-        .select("*, session:class_sessions!inner(session_date)", { count: "exact", head: true })
+        .select("student_id, session:class_sessions!inner(session_date)")
         .eq("present", true)
         .gte("class_sessions.session_date", monthStart)
         .lt("class_sessions.session_date", monthEnd),
       supabase
         .from("attendance")
-        .select("*, session:class_sessions!inner(session_date)", { count: "exact", head: true })
+        .select("student_id, session:class_sessions!inner(session_date)")
         .eq("present", true)
         .eq("fee_exempt", false)
         .gte("class_sessions.session_date", monthStart)
         .lt("class_sessions.session_date", monthEnd),
       supabase
         .from("payments")
-        .select("amount")
+        .select("student_id, amount")
         .eq("month", currentMonth)
         .eq("year", currentYear)
         .eq("voided", false),
@@ -51,11 +60,12 @@ export default async function DashboardPage() {
         .eq("voided", false),
     ]);
 
-  const totalStudents = studentsResult.count ?? 0;
-  const monthSessions = sessionsResult.count ?? 0;
-  const monthAttendances = attendanceResult.count ?? 0;
-  const chargeableAttendances = chargeableResult.count ?? 0;
-  const monthPayments =
+  const students = studentsResult.data ?? [];
+  const totalStudents = students.length;
+  const monthSessions = (sessionsResult.data ?? []).length;
+  const monthAttendances = (attendanceResult.data ?? []).length;
+  const chargeableAttendances = (chargeableResult.data ?? []).length;
+  const monthPaymentsTotal =
     paymentsResult.data?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
   const yearRefunds =
     refundsResult.data?.reduce((sum, r) => sum + Number(r.amount), 0) ?? 0;
@@ -66,6 +76,28 @@ export default async function DashboardPage() {
       ? Math.round((monthAttendances / totalPossible) * 100)
       : 0;
   const monthDue = chargeableAttendances * APP_CONFIG.feePerSession;
+
+  // Per-student chargeable attendance counts
+  const chargeableCounts: Record<string, number> = {};
+  (chargeableResult.data ?? []).forEach((a) => {
+    chargeableCounts[a.student_id] = (chargeableCounts[a.student_id] ?? 0) + 1;
+  });
+
+  // Per-student payment sums
+  const paymentSums: Record<string, number> = {};
+  (paymentsResult.data ?? []).forEach((p) => {
+    paymentSums[p.student_id] = (paymentSums[p.student_id] ?? 0) + Number(p.amount);
+  });
+
+  // Outstanding students: balance < 0
+  const outstandingStudents = students
+    .map((s) => {
+      const due = (chargeableCounts[s.id] ?? 0) * APP_CONFIG.feePerSession;
+      const paid = paymentSums[s.id] ?? 0;
+      return { ...s, due, paid, balance: paid - due };
+    })
+    .filter((s) => s.balance < 0)
+    .sort((a, b) => a.balance - b.balance);
 
   const stats: {
     title: string;
@@ -99,7 +131,7 @@ export default async function DashboardPage() {
     },
     {
       title: "本月收款",
-      value: `${APP_CONFIG.currency} ${monthPayments.toFixed(2)}`,
+      value: `${APP_CONFIG.currency} ${monthPaymentsTotal.toFixed(2)}`,
       icon: DollarSign,
       description: `${currentYear}年${currentMonth}月`,
     },
@@ -135,6 +167,50 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Outstanding Students */}
+      {outstandingStudents.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base">
+              本月欠费学生
+            </CardTitle>
+            <Badge variant="destructive" className="tabular-nums">
+              {outstandingStudents.length} 人
+            </Badge>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>姓名</TableHead>
+                  <TableHead>班级</TableHead>
+                  <TableHead className="text-right">应缴</TableHead>
+                  <TableHead className="text-right">已付</TableHead>
+                  <TableHead className="text-right">欠费</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {outstandingStudents.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{s.school_class || "-"}</TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
+                      {APP_CONFIG.currency} {s.due.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
+                      {APP_CONFIG.currency} {s.paid.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap text-destructive font-medium">
+                      {APP_CONFIG.currency} {s.balance.toFixed(2)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
