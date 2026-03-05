@@ -26,7 +26,7 @@ export default async function DashboardPage() {
       ? `${currentYear + 1}-01-01`
       : `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
 
-  const [studentsResult, sessionsResult, attendanceResult, chargeableResult, paymentsResult, refundsResult] =
+  const [studentsResult, sessionsResult, attendanceResult, chargeableResult, paymentsResult, refundsResult, allChargeableResult, allPaymentsResult] =
     await Promise.all([
       supabase.from("students").select("id, name, school_class").eq("active", true).order("name"),
       supabase
@@ -58,6 +58,17 @@ export default async function DashboardPage() {
         .select("amount")
         .eq("year", currentYear)
         .eq("voided", false),
+      // All-time chargeable attendance (for outstanding table)
+      supabase
+        .from("attendance")
+        .select("student_id")
+        .eq("present", true)
+        .eq("fee_exempt", false),
+      // All-time payments (for outstanding table)
+      supabase
+        .from("payments")
+        .select("student_id, amount")
+        .eq("voided", false),
     ]);
 
   const students = studentsResult.data ?? [];
@@ -77,27 +88,33 @@ export default async function DashboardPage() {
       : 0;
   const monthDue = chargeableAttendances * APP_CONFIG.feePerSession;
 
-  // Per-student chargeable attendance counts
-  const chargeableCounts: Record<string, number> = {};
-  (chargeableResult.data ?? []).forEach((a) => {
-    chargeableCounts[a.student_id] = (chargeableCounts[a.student_id] ?? 0) + 1;
+  // Per-student all-time chargeable attendance counts (for outstanding table)
+  const allChargeableCounts: Record<string, number> = {};
+  (allChargeableResult.data ?? []).forEach((a) => {
+    allChargeableCounts[a.student_id] = (allChargeableCounts[a.student_id] ?? 0) + 1;
   });
 
-  // Per-student payment sums
-  const paymentSums: Record<string, number> = {};
-  (paymentsResult.data ?? []).forEach((p) => {
-    paymentSums[p.student_id] = (paymentSums[p.student_id] ?? 0) + Number(p.amount);
+  // Per-student all-time payment sums (for outstanding table)
+  const allPaymentSums: Record<string, number> = {};
+  (allPaymentsResult.data ?? []).forEach((p) => {
+    allPaymentSums[p.student_id] = (allPaymentSums[p.student_id] ?? 0) + Number(p.amount);
   });
 
-  // Outstanding students: balance < 0
+  // Outstanding students: balance < 0, sorted by class then name
   const outstandingStudents = students
     .map((s) => {
-      const due = (chargeableCounts[s.id] ?? 0) * APP_CONFIG.feePerSession;
-      const paid = paymentSums[s.id] ?? 0;
+      const due = (allChargeableCounts[s.id] ?? 0) * APP_CONFIG.feePerSession;
+      const paid = allPaymentSums[s.id] ?? 0;
       return { ...s, due, paid, balance: paid - due };
     })
     .filter((s) => s.balance < 0)
-    .sort((a, b) => a.balance - b.balance);
+    .sort((a, b) => {
+      const classA = a.school_class || "\uffff";
+      const classB = b.school_class || "\uffff";
+      const classCompare = classA.localeCompare(classB, "zh");
+      if (classCompare !== 0) return classCompare;
+      return a.name.localeCompare(b.name, "zh");
+    });
 
   const stats: {
     title: string;
@@ -173,7 +190,7 @@ export default async function DashboardPage() {
         <Card className="mt-6">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base">
-              本月欠费学生
+              欠费学生
             </CardTitle>
             <Badge variant="destructive" className="tabular-nums">
               {outstandingStudents.length} 人
