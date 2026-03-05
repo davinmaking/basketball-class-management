@@ -134,7 +134,7 @@ export default function CoachesPage() {
     // Check if coach has linked records
     const [sessions, payments, refunds] = await Promise.all([
       supabase
-        .from("class_sessions")
+        .from("session_coaches")
         .select("id", { count: "exact", head: true })
         .eq("coach_id", deletingCoach.id),
       supabase

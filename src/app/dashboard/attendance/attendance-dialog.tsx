@@ -12,13 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -41,7 +34,7 @@ import { DAYS_OF_WEEK } from "@/lib/constants";
 import { groupStudentsByClass } from "@/lib/student-groups";
 
 type Session = Tables<"class_sessions"> & {
-  coach?: { name: string } | null;
+  session_coaches?: { coach: { id: string; name: string } }[];
 };
 type Student = Tables<"students">;
 type Coach = Tables<"coaches">;
@@ -53,7 +46,6 @@ interface AttendanceDialogProps {
   sessionDate: string; // "yyyy-MM-dd"
   students: Student[];
   coaches: Coach[];
-  coachName?: string | null;
   onSaved: () => void;
   onDeleted: () => void;
 }
@@ -65,7 +57,6 @@ export function AttendanceDialog({
   sessionDate,
   students,
   coaches,
-  coachName,
   onSaved,
   onDeleted,
 }: AttendanceDialogProps) {
@@ -75,7 +66,7 @@ export function AttendanceDialog({
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteWarning, setDeleteWarning] = useState("");
-  const [selectedCoachId, setSelectedCoachId] = useState<string>("");
+  const [selectedCoachIds, setSelectedCoachIds] = useState<string[]>([]);
 
   const supabase = createClient();
 
@@ -93,23 +84,45 @@ export function AttendanceDialog({
   // Initialize coach selection when dialog opens
   useEffect(() => {
     if (open && session) {
-      setSelectedCoachId(session.coach_id ?? "none");
+      const ids = (session.session_coaches ?? [])
+        .map((sc) => sc.coach?.id)
+        .filter((id): id is string => !!id);
+      setSelectedCoachIds(ids);
     }
   }, [open, session]);
 
-  async function handleCoachChange(coachId: string) {
+  async function handleCoachToggle(coachId: string) {
     if (!session) return;
-    setSelectedCoachId(coachId);
-    const newCoachId = coachId === "none" ? null : coachId;
-    const { error } = await supabase
-      .from("class_sessions")
-      .update({ coach_id: newCoachId })
-      .eq("id", session.id);
-    if (error) {
-      toast.error("更换教练失败");
-      return;
+
+    const isSelected = selectedCoachIds.includes(coachId);
+    let newIds: string[];
+
+    if (isSelected) {
+      // Remove coach
+      newIds = selectedCoachIds.filter((id) => id !== coachId);
+      const { error } = await supabase
+        .from("session_coaches")
+        .delete()
+        .eq("session_id", session.id)
+        .eq("coach_id", coachId);
+      if (error) {
+        toast.error("移除教练失败");
+        return;
+      }
+    } else {
+      // Add coach
+      newIds = [...selectedCoachIds, coachId];
+      const { error } = await supabase
+        .from("session_coaches")
+        .insert({ session_id: session.id, coach_id: coachId });
+      if (error) {
+        toast.error("添加教练失败");
+        return;
+      }
     }
-    toast.success("教练已更换");
+
+    setSelectedCoachIds(newIds);
+    toast.success("教练已更新");
     onSaved(); // refresh parent data
   }
 
@@ -120,7 +133,7 @@ export function AttendanceDialog({
         setAttendance({});
         setFeeExempt({});
         setDeleteWarning("");
-        setSelectedCoachId("");
+        setSelectedCoachIds([]);
       }
       return;
     }
@@ -264,21 +277,20 @@ export function AttendanceDialog({
 
           {/* Coach selector */}
           {coaches.length > 0 && (
-            <div className="flex items-center gap-2 pb-2 border-b">
+            <div className="flex items-center gap-3 pb-2 border-b flex-wrap">
               <span className="text-sm text-muted-foreground shrink-0">教练:</span>
-              <Select value={selectedCoachId} onValueChange={handleCoachChange}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="未指定" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">未指定</SelectItem>
-                  {coaches.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {coaches.map((c) => (
+                <label
+                  key={c.id}
+                  className="flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Checkbox
+                    checked={selectedCoachIds.includes(c.id)}
+                    onCheckedChange={() => handleCoachToggle(c.id)}
+                  />
+                  <span className="text-sm">{c.name}</span>
+                </label>
+              ))}
             </div>
           )}
 

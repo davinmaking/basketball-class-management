@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Tables } from "@/types/database";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,7 +64,7 @@ import { groupStudentsByClass } from "@/lib/student-groups";
 import { AttendanceDialog } from "./attendance-dialog";
 
 type Session = Tables<"class_sessions"> & {
-  coach: { name: string } | null;
+  session_coaches: { coach: { id: string; name: string } }[];
 };
 type Student = Tables<"students">;
 type Coach = Tables<"coaches">;
@@ -94,7 +95,7 @@ export default function AttendancePage() {
   const [showBulk, setShowBulk] = useState(false);
   const [newDate, setNewDate] = useState("");
   const [bulkDay, setBulkDay] = useState("6");
-  const [newCoachId, setNewCoachId] = useState<string>("");
+  const [newCoachIds, setNewCoachIds] = useState<string[]>([]);
 
   // Coaches
   const [coaches, setCoaches] = useState<Coach[]>([]);
@@ -191,7 +192,7 @@ export default function AttendancePage() {
 
     const sessionsRes = await supabase
       .from("class_sessions")
-      .select("*, coach:coaches(name)")
+      .select("*, session_coaches(coach:coaches(id, name))")
       .gte("session_date", startDate)
       .lt("session_date", endDate)
       .order("session_date");
@@ -290,11 +291,8 @@ export default function AttendancePage() {
 
     const { data, error } = await supabase
       .from("class_sessions")
-      .insert({
-        session_date: dateStr,
-        coach_id: newCoachId && newCoachId !== "none" ? newCoachId : null,
-      })
-      .select("*, coach:coaches(name)")
+      .insert({ session_date: dateStr })
+      .select("*, session_coaches(coach:coaches(id, name))")
       .single();
 
     if (error) {
@@ -306,8 +304,21 @@ export default function AttendancePage() {
       return;
     }
 
+    // Insert coach assignments
+    if (newCoachIds.length > 0) {
+      await supabase.from("session_coaches").insert(
+        newCoachIds.map((cid) => ({ session_id: data.id, coach_id: cid }))
+      );
+    }
+
     await fetchData();
-    setDialogSession(data);
+    // Re-fetch the session with coaches populated
+    const { data: refreshed } = await supabase
+      .from("class_sessions")
+      .select("*, session_coaches(coach:coaches(id, name))")
+      .eq("id", data.id)
+      .single();
+    setDialogSession(refreshed ?? data);
     setDialogDate(dateStr);
     setDialogOpen(true);
   }
@@ -316,9 +327,11 @@ export default function AttendancePage() {
 
   async function addSession() {
     if (!newDate) return;
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("class_sessions")
-      .insert({ session_date: newDate, coach_id: newCoachId || null });
+      .insert({ session_date: newDate })
+      .select("id")
+      .single();
 
     if (error) {
       if (error.code === "23505") {
@@ -327,6 +340,13 @@ export default function AttendancePage() {
         toast.error("添加训练课失败");
       }
       return;
+    }
+
+    // Insert coach assignments
+    if (newCoachIds.length > 0 && data) {
+      await supabase.from("session_coaches").insert(
+        newCoachIds.map((cid) => ({ session_id: data.id, coach_id: cid }))
+      );
     }
 
     toast.success("训练课已添加");
@@ -346,7 +366,6 @@ export default function AttendancePage() {
 
     const dates = matchingDays.map((d) => ({
       session_date: format(d, "yyyy-MM-dd"),
-      coach_id: newCoachId && newCoachId !== "none" ? newCoachId : null,
     }));
 
     if (dates.length === 0) {
@@ -354,13 +373,24 @@ export default function AttendancePage() {
       return;
     }
 
-    const { error } = await supabase
+    const { data: insertedSessions, error } = await supabase
       .from("class_sessions")
-      .upsert(dates, { onConflict: "session_date" });
+      .upsert(dates, { onConflict: "session_date" })
+      .select("id");
 
     if (error) {
       toast.error("添加训练课失败");
       return;
+    }
+
+    // Insert coach assignments for all new sessions
+    if (newCoachIds.length > 0 && insertedSessions && insertedSessions.length > 0) {
+      const coachRows = insertedSessions.flatMap((s) =>
+        newCoachIds.map((cid) => ({ session_id: s.id, coach_id: cid }))
+      );
+      await supabase
+        .from("session_coaches")
+        .upsert(coachRows, { onConflict: "session_id,coach_id" });
     }
 
     toast.success(`成功添加 ${dates.length} 节训练课`);
@@ -461,7 +491,10 @@ export default function AttendancePage() {
               const hasAttendance =
                 hasSession && sessionsWithAttendance.has(session.id);
 
-              const coachName = session?.coach?.name;
+              const coachNames = session?.session_coaches
+                ?.map((sc) => sc.coach?.name)
+                .filter(Boolean)
+                .join(", ");
 
               return (
                 <button
@@ -484,11 +517,11 @@ export default function AttendancePage() {
                   `}
                 >
                   {day.getDate()}
-                  {coachName && inMonth && (
+                  {coachNames && inMonth && (
                     <span className={`text-[10px] leading-tight truncate max-w-full px-0.5 ${
                       hasAttendance ? "text-primary-foreground/80" : "text-muted-foreground"
                     }`}>
-                      {coachName}
+                      {coachNames}
                     </span>
                   )}
                 </button>
@@ -550,7 +583,6 @@ export default function AttendancePage() {
         sessionDate={dialogDate}
         students={students}
         coaches={coaches}
-        coachName={dialogSession?.coach?.name}
         onSaved={() => fetchData()}
         onDeleted={() => fetchData()}
       />
@@ -558,7 +590,7 @@ export default function AttendancePage() {
       {/* Add single date dialog */}
       <Dialog open={showAdd} onOpenChange={(open) => {
         setShowAdd(open);
-        if (!open) setNewCoachId("");
+        if (!open) setNewCoachIds([]);
       }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -573,24 +605,11 @@ export default function AttendancePage() {
                 onChange={(e) => setNewDate(e.target.value)}
               />
             </div>
-            {coaches.length > 0 && (
-              <div className="space-y-2">
-                <Label>负责教练</Label>
-                <Select value={newCoachId} onValueChange={setNewCoachId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择教练（可选）" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">不指定</SelectItem>
-                    {coaches.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <CoachMultiSelect
+              coaches={coaches}
+              selectedIds={newCoachIds}
+              onChange={setNewCoachIds}
+            />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAdd(false)}>
                 取消
@@ -609,7 +628,7 @@ export default function AttendancePage() {
         onOpenChange={(open) => {
           if (!open) {
             setConfirmCreateDate(null);
-            setNewCoachId("");
+            setNewCoachIds([]);
           }
         }}
       >
@@ -620,24 +639,11 @@ export default function AttendancePage() {
               {confirmCreateDate && `${format(confirmCreateDate, "yyyy-MM-dd")}（${DAYS_OF_WEEK[getDay(confirmCreateDate)]}）尚未安排训练课。是否创建并记录出勤？`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {coaches.length > 0 && (
-            <div className="space-y-2">
-              <Label>负责教练</Label>
-              <Select value={newCoachId} onValueChange={setNewCoachId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="选择教练（可选）" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">不指定</SelectItem>
-                  {coaches.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <CoachMultiSelect
+            coaches={coaches}
+            selectedIds={newCoachIds}
+            onChange={setNewCoachIds}
+          />
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={confirmCreateSession}>
@@ -650,7 +656,7 @@ export default function AttendancePage() {
       {/* Bulk add dialog */}
       <Dialog open={showBulk} onOpenChange={(open) => {
         setShowBulk(open);
-        if (!open) setNewCoachId("");
+        if (!open) setNewCoachIds([]);
       }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -675,24 +681,11 @@ export default function AttendancePage() {
                 </SelectContent>
               </Select>
             </div>
-            {coaches.length > 0 && (
-              <div className="space-y-2">
-                <Label>负责教练</Label>
-                <Select value={newCoachId} onValueChange={setNewCoachId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择教练（可选）" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">不指定</SelectItem>
-                    {coaches.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <CoachMultiSelect
+              coaches={coaches}
+              selectedIds={newCoachIds}
+              onChange={setNewCoachIds}
+            />
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowBulk(false)}>
                 取消
@@ -702,6 +695,48 @@ export default function AttendancePage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ── Coach multi-select component ──────────────────────────
+
+function CoachMultiSelect({
+  coaches,
+  selectedIds,
+  onChange,
+}: {
+  coaches: Coach[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  if (coaches.length === 0) return null;
+
+  function toggle(coachId: string) {
+    if (selectedIds.includes(coachId)) {
+      onChange(selectedIds.filter((id) => id !== coachId));
+    } else {
+      onChange([...selectedIds, coachId]);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label>负责教练</Label>
+      <div className="space-y-1">
+        {coaches.map((c) => (
+          <label
+            key={c.id}
+            className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+          >
+            <Checkbox
+              checked={selectedIds.includes(c.id)}
+              onCheckedChange={() => toggle(c.id)}
+            />
+            <span className="text-sm">{c.name}</span>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }

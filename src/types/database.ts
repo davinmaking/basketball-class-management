@@ -162,29 +162,54 @@ export type Database = {
       }
       class_sessions: {
         Row: {
-          coach_id: string | null
           created_at: string | null
           id: string
           notes: string | null
           session_date: string
         }
         Insert: {
-          coach_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
           session_date: string
         }
         Update: {
-          coach_id?: string | null
           created_at?: string | null
           id?: string
           notes?: string | null
           session_date?: string
         }
+        Relationships: []
+      }
+      session_coaches: {
+        Row: {
+          id: string
+          session_id: string
+          coach_id: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          session_id: string
+          coach_id: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          session_id?: string
+          coach_id?: string
+          created_at?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "class_sessions_coach_id_fkey"
+            foreignKeyName: "session_coaches_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_coaches_coach_id_fkey"
             columns: ["coach_id"]
             isOneToOne: false
             referencedRelation: "coaches"
