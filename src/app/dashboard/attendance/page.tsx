@@ -435,145 +435,157 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Month navigation */}
-      <div className="flex items-center gap-2 mb-4">
-        <Button variant="outline" size="icon" onClick={prevMonth}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <h2 className="text-lg font-semibold min-w-[140px] text-center">
-          {selectedYear}年{MONTHS[selectedMonth]}
-        </h2>
-        <Button variant="outline" size="icon" onClick={nextMonth}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        {!isCurrentMonth && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={goToday}
-            className="ml-2"
-          >
-            今天
-          </Button>
-        )}
-        <span className="text-sm text-muted-foreground ml-auto">
-          本月 {sessions.length} 节课
-        </span>
-      </div>
+      {/* Main content: side-by-side on desktop */}
+      <div className="flex flex-col lg:flex-row-reverse lg:gap-6 lg:items-start">
 
-      {/* Calendar grid */}
-      <div className="border rounded-lg overflow-hidden">
-        {/* Day headers */}
-        <div className="grid grid-cols-7 border-b bg-muted/50">
-          {CAL_HEADERS.map((d) => (
-            <div
-              key={d}
-              className="py-2 text-center text-sm font-medium text-muted-foreground"
-            >
-              {d}
-            </div>
-          ))}
-        </div>
-
-        {/* Day cells */}
-        {loading ? (
-          <div className="py-16 text-center text-muted-foreground">
-            加载中...
+        {/* Calendar section — top on mobile, right on desktop */}
+        <div className="lg:w-[340px] lg:shrink-0">
+          {/* Month navigation */}
+          <div className="flex items-center gap-2 mb-4">
+            <Button variant="outline" size="icon" onClick={prevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <h2 className="text-lg font-semibold min-w-[120px] text-center">
+              {selectedYear}年{MONTHS[selectedMonth]}
+            </h2>
+            <Button variant="outline" size="icon" onClick={nextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {!isCurrentMonth && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goToday}
+                className="ml-1"
+              >
+                今天
+              </Button>
+            )}
           </div>
-        ) : (
-          <div className="grid grid-cols-7">
-            {calendarDays.map((day) => {
-              const dateStr = format(day, "yyyy-MM-dd");
-              const inMonth = isSameMonth(day, currentMonthDate);
-              const today = isToday(day);
-              const session = sessionMap.get(dateStr);
-              const hasSession = !!session;
-              const hasAttendance =
-                hasSession && sessionsWithAttendance.has(session.id);
 
-              const coachNames = session?.session_coaches
-                ?.map((sc) => sc.coach?.name)
-                .filter(Boolean)
-                .join(", ");
-
-              return (
-                <button
-                  key={dateStr}
-                  onClick={() => inMonth && handleDateClick(day)}
-                  disabled={!inMonth}
-                  className={`
-                    relative aspect-square flex flex-col items-center justify-center
-                    text-sm border-b border-r transition-colors
-                    ${
-                      !inMonth
-                        ? "text-muted-foreground/25 cursor-default bg-muted/20"
-                        : hasAttendance
-                        ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
-                        : hasSession
-                        ? "bg-primary/20 text-primary font-semibold hover:bg-primary/30"
-                        : "hover:bg-muted cursor-pointer"
-                    }
-                    ${today && inMonth ? "ring-2 ring-primary ring-inset" : ""}
-                  `}
+          {/* Calendar grid */}
+          <div className="border rounded-lg overflow-hidden">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 border-b bg-muted/50">
+              {CAL_HEADERS.map((d) => (
+                <div
+                  key={d}
+                  className="py-1.5 text-center text-xs font-medium text-muted-foreground"
                 >
-                  {day.getDate()}
-                  {coachNames && inMonth && (
-                    <span className={`text-[10px] leading-tight truncate max-w-full px-0.5 ${
-                      hasAttendance ? "text-primary-foreground/80" : "text-muted-foreground"
-                    }`}>
-                      {coachNames}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                  {d}
+                </div>
+              ))}
+            </div>
 
-      <p className="text-xs text-muted-foreground mt-3">
-        点击日期记录出勤，再次点击查看/修改出勤记录
-      </p>
+            {/* Day cells */}
+            {loading ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">
+                加载中...
+              </div>
+            ) : (
+              <div className="grid grid-cols-7">
+                {calendarDays.map((day) => {
+                  const dateStr = format(day, "yyyy-MM-dd");
+                  const inMonth = isSameMonth(day, currentMonthDate);
+                  const today = isToday(day);
+                  const session = sessionMap.get(dateStr);
+                  const hasSession = !!session;
+                  const hasAttendance =
+                    hasSession && sessionsWithAttendance.has(session.id);
 
-      {/* Monthly Summary */}
-      {!loading && sessions.length > 0 && activeStudents.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="text-base">
-              {selectedYear}年{MONTHS[selectedMonth]} 月度汇总
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>学生</TableHead>
-                  <TableHead>班级</TableHead>
-                  <TableHead className="text-center">出勤</TableHead>
-                  <TableHead className="text-center">总课</TableHead>
-                  <TableHead className="text-center">出勤率</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {groupedStudents.map(([className, group]) => {
-                  const isCollapsed = collapsedGroups.has(className);
+                  const coachNames = session?.session_coaches
+                    ?.map((sc) => sc.coach?.name)
+                    .filter(Boolean)
+                    .join(", ");
+
                   return (
-                    <GroupRows
-                      key={className}
-                      className={className}
-                      students={group}
-                      totalSessions={sessions.length}
-                      summaryAttendance={summaryAttendance}
-                      isCollapsed={isCollapsed}
-                      onToggle={() => toggleGroup(className)}
-                    />
+                    <button
+                      key={dateStr}
+                      onClick={() => inMonth && handleDateClick(day)}
+                      disabled={!inMonth}
+                      className={`
+                        relative aspect-square flex flex-col items-center justify-center
+                        text-xs border-b border-r transition-colors
+                        ${
+                          !inMonth
+                            ? "text-muted-foreground/25 cursor-default bg-muted/20"
+                            : hasAttendance
+                            ? "bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
+                            : hasSession
+                            ? "bg-primary/20 text-primary font-semibold hover:bg-primary/30"
+                            : "hover:bg-muted cursor-pointer"
+                        }
+                        ${today && inMonth ? "ring-2 ring-primary ring-inset" : ""}
+                      `}
+                    >
+                      {day.getDate()}
+                      {coachNames && inMonth && (
+                        <span className={`text-[9px] leading-tight truncate max-w-full px-0.5 ${
+                          hasAttendance ? "text-primary-foreground/80" : "text-muted-foreground"
+                        }`}>
+                          {coachNames}
+                        </span>
+                      )}
+                    </button>
                   );
                 })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-2 mb-4 lg:mb-0">
+            <p className="text-xs text-muted-foreground">
+              点击日期记录出勤
+            </p>
+            <span className="text-xs text-muted-foreground">
+              本月 {sessions.length} 节课
+            </span>
+          </div>
+        </div>
+
+        {/* Summary section — below on mobile, left on desktop */}
+        <div className="flex-1 min-w-0">
+          {!loading && sessions.length > 0 && activeStudents.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {selectedYear}年{MONTHS[selectedMonth]} 月度汇总
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>学生</TableHead>
+                      <TableHead>班级</TableHead>
+                      <TableHead className="text-center">出勤</TableHead>
+                      <TableHead className="text-center">总课</TableHead>
+                      <TableHead className="text-center">出勤率</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupedStudents.map(([className, group]) => {
+                      const isCollapsed = collapsedGroups.has(className);
+                      return (
+                        <GroupRows
+                          key={className}
+                          className={className}
+                          students={group}
+                          totalSessions={sessions.length}
+                          summaryAttendance={summaryAttendance}
+                          isCollapsed={isCollapsed}
+                          onToggle={() => toggleGroup(className)}
+                        />
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+      </div>
 
       {/* Attendance Dialog */}
       <AttendanceDialog
