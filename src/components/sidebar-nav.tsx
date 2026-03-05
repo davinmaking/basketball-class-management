@@ -5,8 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Users,
   ClipboardCheck,
-  DollarSign,
-  Receipt,
+  Wallet,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -32,8 +31,7 @@ const navItems = [
   { href: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
   { href: "/dashboard/students", label: "学生", icon: Users },
   { href: "/dashboard/attendance", label: "出勤", icon: ClipboardCheck },
-  { href: "/dashboard/fees", label: "费用", icon: DollarSign },
-  { href: "/dashboard/receipts", label: "收据", icon: Receipt },
+  { href: "/dashboard/finance", label: "财务", icon: Wallet },
   { href: "/dashboard/coaches", label: "教练", icon: UserCog },
   { href: "/dashboard/reports", label: "报表", icon: BarChart3 },
 ];

@@ -3,7 +3,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StudentReport } from "./student-report";
 import { MonthlyReport } from "./monthly-report";
-import { CoachPayments } from "./coach-payments";
 import { AnnualReport } from "./annual-report";
 
 export default function ReportsPage() {
@@ -14,7 +13,6 @@ export default function ReportsPage() {
         <TabsList className="mb-4 flex flex-wrap h-auto gap-1">
           <TabsTrigger value="student">学生报表</TabsTrigger>
           <TabsTrigger value="monthly">月度报表</TabsTrigger>
-          <TabsTrigger value="coach-pay">教练薪酬</TabsTrigger>
           <TabsTrigger value="annual">年度报表</TabsTrigger>
         </TabsList>
         <TabsContent value="student">
@@ -22,9 +20,6 @@ export default function ReportsPage() {
         </TabsContent>
         <TabsContent value="monthly">
           <MonthlyReport />
-        </TabsContent>
-        <TabsContent value="coach-pay">
-          <CoachPayments />
         </TabsContent>
         <TabsContent value="annual">
           <AnnualReport />

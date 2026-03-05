@@ -73,7 +73,7 @@ interface CreditNoteRow {
   coach_name: string | null;
 }
 
-export default function ReceiptsPage() {
+export function Receipts() {
   const [receipts, setReceipts] = useState<ReceiptRow[]>([]);
   const [creditNotes, setCreditNotes] = useState<CreditNoteRow[]>([]);
   const [search, setSearch] = useState("");

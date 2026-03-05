@@ -126,7 +126,7 @@ function getWhatsAppUrl(
   return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
 }
 
-export default function FeesPage() {
+export function StudentFees() {
   const [feeData, setFeeData] = useState<FeeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
