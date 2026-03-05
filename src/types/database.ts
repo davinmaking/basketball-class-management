@@ -86,6 +86,56 @@ export type Database = {
           },
         ]
       }
+      coach_payments: {
+        Row: {
+          amount: number
+          coach_id: string
+          created_at: string | null
+          id: string
+          month: number
+          notes: string | null
+          payment_date: string
+          voided: boolean
+          voided_at: string | null
+          voided_reason: string | null
+          year: number
+        }
+        Insert: {
+          amount: number
+          coach_id: string
+          created_at?: string | null
+          id?: string
+          month: number
+          notes?: string | null
+          payment_date?: string
+          voided?: boolean
+          voided_at?: string | null
+          voided_reason?: string | null
+          year: number
+        }
+        Update: {
+          amount?: number
+          coach_id?: string
+          created_at?: string | null
+          id?: string
+          month?: number
+          notes?: string | null
+          payment_date?: string
+          voided?: boolean
+          voided_at?: string | null
+          voided_reason?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_payments_coach_id_fkey"
+            columns: ["coach_id"]
+            isOneToOne: false
+            referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coaches: {
         Row: {
           active: boolean
