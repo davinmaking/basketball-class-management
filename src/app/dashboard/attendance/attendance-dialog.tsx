@@ -74,7 +74,7 @@ export function AttendanceDialog({
   const [saving, setSaving] = useState(false);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleteBlocked, setDeleteBlocked] = useState(false);
+  const [deleteWarning, setDeleteWarning] = useState("");
   const [selectedCoachId, setSelectedCoachId] = useState<string>("");
 
   const supabase = createClient();
@@ -119,7 +119,7 @@ export function AttendanceDialog({
       if (!open) {
         setAttendance({});
         setFeeExempt({});
-        setDeleteBlocked(false);
+        setDeleteWarning("");
         setSelectedCoachId("");
       }
       return;
@@ -195,7 +195,7 @@ export function AttendanceDialog({
   async function handleDeleteClick() {
     if (!session) return;
 
-    // Guard: check if this session's month has any payments (#3)
+    // Check if this session's month has any payments — warn but don't block
     const sessionDate = parseISO(session.session_date);
     const month = sessionDate.getMonth() + 1;
     const year = sessionDate.getFullYear();
@@ -208,8 +208,11 @@ export function AttendanceDialog({
       .eq("voided", false);
 
     if (count && count > 0) {
-      setDeleteBlocked(true);
-      return;
+      setDeleteWarning(
+        `该月份已有 ${count} 条付款记录，删除此课堂会影响出勤次数和费用计算。`
+      );
+    } else {
+      setDeleteWarning("");
     }
 
     setConfirmDelete(true);
@@ -364,13 +367,18 @@ export function AttendanceDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation */}
+      {/* Delete confirmation (with optional payment warning) */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除训练课</AlertDialogTitle>
-            <AlertDialogDescription>
-              确定要删除 {sessionDate} 的训练课吗？相关出勤记录也会被删除，此操作不可撤销。
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {deleteWarning && (
+                  <p className="text-amber-600 font-medium">{deleteWarning}</p>
+                )}
+                <p>确定要删除 {sessionDate} 的训练课吗？相关出勤记录也会被删除，此操作不可撤销。</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -381,21 +389,6 @@ export function AttendanceDialog({
             >
               删除
             </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete blocked warning */}
-      <AlertDialog open={deleteBlocked} onOpenChange={setDeleteBlocked}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>无法删除</AlertDialogTitle>
-            <AlertDialogDescription>
-              该月份已有付款记录，删除训练课可能影响费用计算。请先处理相关付款记录后再删除。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>知道了</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
