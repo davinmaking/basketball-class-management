@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Calendar, ClipboardCheck, DollarSign, Undo2 } from "lucide-react";
+import { Users, Calendar, ClipboardCheck, DollarSign, Undo2, Banknote } from "lucide-react";
 import { APP_CONFIG } from "@/lib/config";
 
 export default async function DashboardPage() {
@@ -11,30 +11,33 @@ export default async function DashboardPage() {
   const currentYear = now.getFullYear();
 
   // Get stats
-  const [studentsResult, sessionsResult, attendanceResult, paymentsResult, refundsResult] =
+  const monthStart = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+  const monthEnd =
+    currentMonth === 12
+      ? `${currentYear + 1}-01-01`
+      : `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
+
+  const [studentsResult, sessionsResult, attendanceResult, chargeableResult, paymentsResult, refundsResult] =
     await Promise.all([
       supabase.from("students").select("id", { count: "exact", head: true }).eq("active", true),
       supabase
         .from("class_sessions")
         .select("id", { count: "exact", head: true })
-        .gte("session_date", `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`)
-        .lt(
-          "session_date",
-          currentMonth === 12
-            ? `${currentYear + 1}-01-01`
-            : `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`
-        ),
+        .gte("session_date", monthStart)
+        .lt("session_date", monthEnd),
       supabase
         .from("attendance")
         .select("*, session:class_sessions!inner(session_date)", { count: "exact", head: true })
         .eq("present", true)
-        .gte("class_sessions.session_date", `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`)
-        .lt(
-          "class_sessions.session_date",
-          currentMonth === 12
-            ? `${currentYear + 1}-01-01`
-            : `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`
-        ),
+        .gte("class_sessions.session_date", monthStart)
+        .lt("class_sessions.session_date", monthEnd),
+      supabase
+        .from("attendance")
+        .select("*, session:class_sessions!inner(session_date)", { count: "exact", head: true })
+        .eq("present", true)
+        .eq("fee_exempt", false)
+        .gte("class_sessions.session_date", monthStart)
+        .lt("class_sessions.session_date", monthEnd),
       supabase
         .from("payments")
         .select("amount")
@@ -51,12 +54,25 @@ export default async function DashboardPage() {
   const totalStudents = studentsResult.count ?? 0;
   const monthSessions = sessionsResult.count ?? 0;
   const monthAttendances = attendanceResult.count ?? 0;
+  const chargeableAttendances = chargeableResult.count ?? 0;
   const monthPayments =
     paymentsResult.data?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
   const yearRefunds =
     refundsResult.data?.reduce((sum, r) => sum + Number(r.amount), 0) ?? 0;
 
-  const stats = [
+  const totalPossible = totalStudents * monthSessions;
+  const attendanceRate =
+    totalPossible > 0
+      ? Math.round((monthAttendances / totalPossible) * 100)
+      : 0;
+  const monthDue = chargeableAttendances * APP_CONFIG.feePerSession;
+
+  const stats: {
+    title: string;
+    value: string | number;
+    icon: typeof Users;
+    description: string;
+  }[] = [
     {
       title: "学生总数",
       value: totalStudents,
@@ -71,9 +87,15 @@ export default async function DashboardPage() {
     },
     {
       title: "本月出勤",
-      value: monthAttendances,
+      value: `${attendanceRate}%`,
       icon: ClipboardCheck,
-      description: "总出勤次数",
+      description: `${monthAttendances} / ${totalPossible} 次`,
+    },
+    {
+      title: "本月应缴付",
+      value: `${APP_CONFIG.currency} ${monthDue.toFixed(2)}`,
+      icon: Banknote,
+      description: `${chargeableAttendances} 次 × ${APP_CONFIG.currency}${APP_CONFIG.feePerSession}`,
     },
     {
       title: "本月收款",
