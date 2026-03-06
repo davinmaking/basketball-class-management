@@ -160,7 +160,7 @@ export default async function ParentViewPage({
             <Dribbble className="h-6 w-6 text-primary" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">{APP_CONFIG.className}</h1>
-          <p className="text-sm text-muted-foreground">家长门户</p>
+          <p className="text-sm text-muted-foreground">家长门户 / Portal Ibu Bapa</p>
         </div>
 
         {/* Student Info */}
@@ -171,13 +171,13 @@ export default async function ParentViewPage({
           <CardContent className="text-sm space-y-1">
             {student.school_class && (
               <p>
-                <span className="text-muted-foreground">班级:</span>{" "}
+                <span className="text-muted-foreground">班级 / Kelas:</span>{" "}
                 {student.school_class}
               </p>
             )}
             {student.parent_name && (
               <p>
-                <span className="text-muted-foreground">联系人:</span>{" "}
+                <span className="text-muted-foreground">联系人 / Hubungan:</span>{" "}
                 {student.parent_name}
                 {student.relationship && ` (${student.relationship})`}
               </p>
@@ -207,7 +207,7 @@ export default async function ParentViewPage({
         <div className={`grid gap-4 ${totalRefunded > 0 ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{displayYear}年总费用</CardTitle>
+              <CardTitle className="text-sm">{displayYear}年总费用 / Jumlah Yuran</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold tracking-tight tabular-nums">{APP_CONFIG.currency} {totalDue.toFixed(2)}</div>
@@ -215,7 +215,7 @@ export default async function ParentViewPage({
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">已支付</CardTitle>
+              <CardTitle className="text-sm">已支付 / Telah Dibayar</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold tracking-tight tabular-nums">{APP_CONFIG.currency} {totalPaid.toFixed(2)}</div>
@@ -224,7 +224,7 @@ export default async function ParentViewPage({
           {totalRefunded > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">已退费</CardTitle>
+                <CardTitle className="text-sm">已退费 / Dikembalikan</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold tracking-tight tabular-nums text-blue-600">
@@ -235,7 +235,7 @@ export default async function ParentViewPage({
           )}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">余额</CardTitle>
+              <CardTitle className="text-sm">余额 / Baki</CardTitle>
             </CardHeader>
             <CardContent>
               <div
@@ -252,17 +252,17 @@ export default async function ParentViewPage({
         {/* Monthly Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle>{displayYear}年月度汇总</CardTitle>
+            <CardTitle>{displayYear}年月度汇总 / Ringkasan Bulanan</CardTitle>
           </CardHeader>
           <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>月份</TableHead>
-                  <TableHead className="text-center">出勤</TableHead>
-                  <TableHead className="text-right">费用</TableHead>
-                  <TableHead className="text-right">已支付</TableHead>
-                  <TableHead className="text-right">余额</TableHead>
+                  <TableHead>月份 / Bulan</TableHead>
+                  <TableHead className="text-center">出勤 / Hadir</TableHead>
+                  <TableHead className="text-right">费用 / Yuran</TableHead>
+                  <TableHead className="text-right">已支付 / Dibayar</TableHead>
+                  <TableHead className="text-right">余额 / Baki</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -272,7 +272,7 @@ export default async function ParentViewPage({
                       colSpan={5}
                       className="text-center py-8 text-muted-foreground"
                     >
-                      本年暂无数据
+                      本年暂无数据 / Tiada data untuk tahun ini
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -313,17 +313,17 @@ export default async function ParentViewPage({
         {(payments ?? []).length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>付款记录</CardTitle>
+              <CardTitle>付款记录 / Rekod Bayaran</CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>日期</TableHead>
-                    <TableHead>期间</TableHead>
-                    <TableHead className="text-right">金额</TableHead>
-                    <TableHead>教练</TableHead>
-                    <TableHead className="text-right">收据</TableHead>
+                    <TableHead>日期 / Tarikh</TableHead>
+                    <TableHead>期间 / Tempoh</TableHead>
+                    <TableHead className="text-right">金额 / Amaun</TableHead>
+                    <TableHead>教练 / Jurulatih</TableHead>
+                    <TableHead className="text-right">收据 / Resit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -338,7 +338,7 @@ export default async function ParentViewPage({
                         <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                           {payment.year}年{payment.month}月
                           {isVoided && (
-                            <Badge variant="destructive" className="ml-2 text-xs">已撤回</Badge>
+                            <Badge variant="destructive" className="ml-2 text-xs">已撤回 / Batal</Badge>
                           )}
                         </TableCell>
                         <TableCell className={`text-right font-medium whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
@@ -376,17 +376,17 @@ export default async function ParentViewPage({
         {(refunds ?? []).length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>退费记录</CardTitle>
+              <CardTitle>退费记录 / Rekod Bayaran Balik</CardTitle>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>日期</TableHead>
-                    <TableHead>期间</TableHead>
-                    <TableHead className="text-right">金额</TableHead>
-                    <TableHead>教练</TableHead>
-                    <TableHead className="text-right">退费单</TableHead>
+                    <TableHead>日期 / Tarikh</TableHead>
+                    <TableHead>期间 / Tempoh</TableHead>
+                    <TableHead className="text-right">金额 / Amaun</TableHead>
+                    <TableHead>教练 / Jurulatih</TableHead>
+                    <TableHead className="text-right">退费单 / Nota Kredit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -400,7 +400,7 @@ export default async function ParentViewPage({
                         <TableCell className="whitespace-nowrap">
                           {refund.month
                             ? `${refund.year}年${refund.month}月`
-                            : `${refund.year}年（全年）`}
+                            : `${refund.year}年（全年 / Setahun）`}
                         </TableCell>
                         <TableCell className="text-right font-medium whitespace-nowrap">
                           {APP_CONFIG.currency} {Number(refund.amount).toFixed(2)}
@@ -437,7 +437,7 @@ export default async function ParentViewPage({
         )}
 
         <p className="text-center text-sm text-muted-foreground">
-          费率: {APP_CONFIG.currency}{APP_CONFIG.feePerSession} / 课
+          费率 / Kadar: {APP_CONFIG.currency}{APP_CONFIG.feePerSession} / 课 / sesi
         </p>
       </div>
     </div>
