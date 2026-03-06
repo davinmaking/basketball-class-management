@@ -405,7 +405,7 @@ export function generateCreditNoteHtml(data: CreditNoteData): string {
     <div class="signature-block">
       <div class="signature-name">${data.coachName ?? ""}</div>
       <div class="signature-line"></div>
-      <div class="signature-label">Diluluskan oleh / 退款人</div>
+      <div class="signature-label">Dibayar balik oleh / 退款人</div>
     </div>
     <div class="signature-block">
       <div class="signature-name">${data.studentName}</div>
