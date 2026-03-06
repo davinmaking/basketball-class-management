@@ -358,6 +358,7 @@ export default async function ParentViewPage({
                               month={payment.month}
                               year={payment.year}
                               notes={payment.notes}
+                              coachName={payment.coach?.name}
                             />
                           )}
                         </TableCell>
@@ -420,6 +421,7 @@ export default async function ParentViewPage({
                               totalSessions={refund.total_sessions}
                               totalDue={Number(refund.total_due)}
                               notes={refund.notes}
+                              coachName={refund.coach?.name}
                             />
                           )}
                         </TableCell>

@@ -224,6 +224,7 @@ export function Receipts() {
       month: receipt.month,
       year: receipt.year,
       notes: receipt.notes,
+      coachName: receipt.coach_name,
     });
     if (!success) {
       toast.error("打印窗口被浏览器拦截，请允许弹出窗口后重试");
@@ -273,6 +274,7 @@ export function Receipts() {
       totalSessions: cn.total_sessions,
       totalDue: Number(cn.total_due),
       notes: cn.notes,
+      coachName: cn.coach_name,
     });
     if (!success) {
       toast.error("打印窗口被浏览器拦截，请允许弹出窗口后重试");

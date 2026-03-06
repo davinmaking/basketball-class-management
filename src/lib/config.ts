@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   schoolAddress: process.env.NEXT_PUBLIC_SCHOOL_ADDRESS || "",
   schoolPhone: process.env.NEXT_PUBLIC_SCHOOL_PHONE || "",
   feePerSession: Number(process.env.NEXT_PUBLIC_FEE_PER_SESSION) || 5,
-  receiptPrefix: process.env.NEXT_PUBLIC_RECEIPT_PREFIX || "SJKT-KLBK",
+  receiptPrefix: process.env.NEXT_PUBLIC_RECEIPT_PREFIX || "RCPT",
   currency: process.env.NEXT_PUBLIC_CURRENCY || "RM",
-  creditNotePrefix: process.env.NEXT_PUBLIC_CREDIT_NOTE_PREFIX || "CN",
+  creditNotePrefix: process.env.NEXT_PUBLIC_CREDIT_NOTE_PREFIX || "RTRN",
 };

@@ -10,23 +10,16 @@ interface ReceiptData {
   month: number;
   year: number;
   notes: string | null;
+  coachName?: string | null;
 }
 
 /**
- * Generates receipt HTML in bilingual Malaysian school format (BM + Chinese).
+ * Generates receipt HTML in bilingual format (BM + Chinese).
  */
 export function generateReceiptHtml(data: ReceiptData): string {
   const dateStr = data.issuedAt
     ? format(parseISO(data.issuedAt), "dd/MM/yyyy")
     : "-";
-
-  const schoolAddress = APP_CONFIG.schoolAddress
-    ? `<p class="school-address">${APP_CONFIG.schoolAddress}</p>`
-    : "";
-
-  const schoolPhone = APP_CONFIG.schoolPhone
-    ? `<p class="school-phone">Tel: ${APP_CONFIG.schoolPhone}</p>`
-    : "";
 
   const schoolClassRow = data.schoolClass
     ? `<tr>
@@ -56,24 +49,11 @@ export function generateReceiptHtml(data: ReceiptData): string {
       font-size: 13px;
       color: #333;
     }
-    .header {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .header h1 {
-      font-size: 16px;
-      font-weight: bold;
-      margin-bottom: 2px;
-    }
-    .school-address, .school-phone {
-      font-size: 11px;
-      color: #666;
-    }
     .receipt-title {
       text-align: center;
       font-size: 15px;
       font-weight: bold;
-      margin: 16px 0 12px;
+      margin: 0 0 16px;
       padding: 6px 0;
       border-top: 2px solid #333;
       border-bottom: 2px solid #333;
@@ -114,29 +94,31 @@ export function generateReceiptHtml(data: ReceiptData): string {
       flex: 1;
       text-align: center;
     }
+    .signature-name {
+      font-weight: 500;
+      font-size: 13px;
+      min-height: 50px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 6px;
+    }
     .signature-line {
       border-bottom: 1px solid #333;
       margin-bottom: 6px;
-      height: 50px;
     }
     .signature-label {
       font-size: 11px;
       color: #666;
     }
-    .stamp-area {
-      margin-top: 24px;
-      text-align: center;
-    }
-    .stamp-box {
-      display: inline-block;
-      width: 120px;
-      height: 80px;
-      border: 1px dashed #ccc;
-      margin-bottom: 6px;
-    }
-    .stamp-label {
-      font-size: 11px;
+    .footer-notes {
+      margin-top: 30px;
+      padding-top: 12px;
+      border-top: 1px solid #eee;
+      font-size: 10px;
       color: #999;
+      text-align: center;
+      line-height: 1.6;
     }
     @media print {
       body { margin: 0; padding: 20px; }
@@ -144,13 +126,7 @@ export function generateReceiptHtml(data: ReceiptData): string {
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>${APP_CONFIG.schoolName}</h1>
-    ${schoolAddress}
-    ${schoolPhone}
-  </div>
-
-  <div class="receipt-title">RESIT RASMI / 正式收据</div>
+  <div class="receipt-title">RESIT PEMBAYARAN / 付款收据</div>
 
   <table class="info-table">
     <tr>
@@ -180,18 +156,22 @@ export function generateReceiptHtml(data: ReceiptData): string {
 
   <div class="signature-section">
     <div class="signature-block">
+      <div class="signature-name">${data.coachName ?? ""}</div>
       <div class="signature-line"></div>
       <div class="signature-label">Diterima oleh / 收款人</div>
     </div>
     <div class="signature-block">
+      <div class="signature-name">${data.studentName}</div>
       <div class="signature-line"></div>
-      <div class="signature-label">Tandatangan Pelajar / 学生签名</div>
+      <div class="signature-label">Nama Murid / 学生</div>
     </div>
   </div>
 
-  <div class="stamp-area">
-    <div class="stamp-box"></div>
-    <div class="stamp-label">Cop Sekolah / 校方盖章</div>
+  <div class="footer-notes">
+    <p>Nota: Resit ini hanya untuk kegunaan ${APP_CONFIG.classNameBm} sahaja.</p>
+    <p>备注：此收据只用作${APP_CONFIG.className}使用。</p>
+    <p style="margin-top: 4px;">Salinan dijana secara digital. Sah tanpa tandatangan tulisan tangan.</p>
+    <p>电子生成文件，无需手写签名即有效。</p>
   </div>
 
   <script>window.print();</script>
@@ -227,23 +207,16 @@ interface CreditNoteData {
   totalSessions: number;
   totalDue: number;
   notes: string | null;
+  coachName?: string | null;
 }
 
 /**
- * Generates credit note HTML in bilingual Malaysian school format (BM + Chinese).
+ * Generates credit note HTML in bilingual format (BM + Chinese).
  */
 export function generateCreditNoteHtml(data: CreditNoteData): string {
   const dateStr = data.issuedAt
     ? format(parseISO(data.issuedAt), "dd/MM/yyyy")
     : "-";
-
-  const schoolAddress = APP_CONFIG.schoolAddress
-    ? `<p class="school-address">${APP_CONFIG.schoolAddress}</p>`
-    : "";
-
-  const schoolPhone = APP_CONFIG.schoolPhone
-    ? `<p class="school-phone">Tel: ${APP_CONFIG.schoolPhone}</p>`
-    : "";
 
   const schoolClassRow = data.schoolClass
     ? `<tr>
@@ -277,24 +250,11 @@ export function generateCreditNoteHtml(data: CreditNoteData): string {
       font-size: 13px;
       color: #333;
     }
-    .header {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .header h1 {
-      font-size: 16px;
-      font-weight: bold;
-      margin-bottom: 2px;
-    }
-    .school-address, .school-phone {
-      font-size: 11px;
-      color: #666;
-    }
     .credit-note-title {
       text-align: center;
       font-size: 15px;
       font-weight: bold;
-      margin: 16px 0 12px;
+      margin: 0 0 16px;
       padding: 6px 0;
       border-top: 2px solid #1a5276;
       border-bottom: 2px solid #1a5276;
@@ -361,29 +321,31 @@ export function generateCreditNoteHtml(data: CreditNoteData): string {
       flex: 1;
       text-align: center;
     }
+    .signature-name {
+      font-weight: 500;
+      font-size: 13px;
+      min-height: 50px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 6px;
+    }
     .signature-line {
       border-bottom: 1px solid #333;
       margin-bottom: 6px;
-      height: 50px;
     }
     .signature-label {
       font-size: 11px;
       color: #666;
     }
-    .stamp-area {
-      margin-top: 24px;
-      text-align: center;
-    }
-    .stamp-box {
-      display: inline-block;
-      width: 120px;
-      height: 80px;
-      border: 1px dashed #ccc;
-      margin-bottom: 6px;
-    }
-    .stamp-label {
-      font-size: 11px;
+    .footer-notes {
+      margin-top: 30px;
+      padding-top: 12px;
+      border-top: 1px solid #eee;
+      font-size: 10px;
       color: #999;
+      text-align: center;
+      line-height: 1.6;
     }
     @media print {
       body { margin: 0; padding: 20px; }
@@ -391,12 +353,6 @@ export function generateCreditNoteHtml(data: CreditNoteData): string {
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>${APP_CONFIG.schoolName}</h1>
-    ${schoolAddress}
-    ${schoolPhone}
-  </div>
-
   <div class="credit-note-title">NOTA KREDIT / 退费单</div>
 
   <table class="info-table">
@@ -447,18 +403,22 @@ export function generateCreditNoteHtml(data: CreditNoteData): string {
 
   <div class="signature-section">
     <div class="signature-block">
+      <div class="signature-name">${data.coachName ?? ""}</div>
       <div class="signature-line"></div>
       <div class="signature-label">Diluluskan oleh / 批准人</div>
     </div>
     <div class="signature-block">
+      <div class="signature-name">${data.studentName}</div>
       <div class="signature-line"></div>
       <div class="signature-label">Penerima / 收款人</div>
     </div>
   </div>
 
-  <div class="stamp-area">
-    <div class="stamp-box"></div>
-    <div class="stamp-label">Cop Sekolah / 校方盖章</div>
+  <div class="footer-notes">
+    <p>Nota: Dokumen ini hanya untuk kegunaan ${APP_CONFIG.classNameBm} sahaja.</p>
+    <p>备注：此文件只用作${APP_CONFIG.className}使用。</p>
+    <p style="margin-top: 4px;">Salinan dijana secara digital. Sah tanpa tandatangan tulisan tangan.</p>
+    <p>电子生成文件，无需手写签名即有效。</p>
   </div>
 
   <script>window.print();</script>

@@ -17,6 +17,7 @@ interface Props {
   totalSessions: number;
   totalDue: number;
   notes: string | null;
+  coachName?: string | null;
 }
 
 export function ParentCreditNoteButton({
@@ -31,6 +32,7 @@ export function ParentCreditNoteButton({
   totalSessions,
   totalDue,
   notes,
+  coachName,
 }: Props) {
   function handlePrint() {
     const success = printCreditNoteHtml({
@@ -45,6 +47,7 @@ export function ParentCreditNoteButton({
       totalSessions,
       totalDue,
       notes,
+      coachName,
     });
     if (!success) {
       toast.error("打印窗口被浏览器拦截，请允许弹出窗口后重试");
