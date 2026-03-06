@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
-import { ChevronLeft, ChevronRight, Dribbble } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Dribbble } from "lucide-react";
 import { ParentReceiptButton } from "./receipt-button";
 import { ParentCreditNoteButton } from "./credit-note-button";
 import { APP_CONFIG } from "@/lib/config";
@@ -155,6 +155,15 @@ export default async function ParentViewPage({
   return (
     <div className="min-h-[100dvh] bg-muted/30 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
+        <div>
+          <Link href="/directory">
+            <Button variant="ghost" size="sm" className="text-muted-foreground">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              返回名册 / Kembali
+            </Button>
+          </Link>
+        </div>
+
         <div className="text-center space-y-2">
           <div className="mx-auto rounded-full bg-primary/10 p-3 w-fit">
             <Dribbble className="h-6 w-6 text-primary" />
@@ -439,6 +448,7 @@ export default async function ParentViewPage({
         <p className="text-center text-sm text-muted-foreground">
           费率 / Kadar: {APP_CONFIG.currency}{APP_CONFIG.feePerSession} / 课 / sesi
         </p>
+
       </div>
     </div>
   );
