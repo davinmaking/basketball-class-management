@@ -25,14 +25,16 @@ Basketball training class management web app for coaches and parents.
 ## Key Business Rules
 - Fee rate and currency configurable via env vars (see `src/lib/config.ts`)
 - Fee-exempt: controlled per-student (`students.fee_exempt`), used as default for attendance `fee_exempt` toggle
-- Receipt number format: `{prefix}-{year}-{month}-{sequential}` (e.g. `SJKT-KLBK-2026-03-001`), generated with month-scoped query + retry on unique constraint (error 23505)
-- Receipt format: bilingual (BM + Chinese) school format with signature line and stamp area
+- Receipt number format: `RCPT-{year}-{month}-{sequential}` (e.g. `RCPT-2026-03-001`), generated with month-scoped query + retry on unique constraint (error 23505)
+- Credit note number format: `RTRN-{year}-{sequential}` (e.g. `RTRN-2026-001`)
+- Receipt/credit note format: bilingual (BM + Chinese), no school header, coach name as 收款人/退款人, student name shown, footer disclaimers, centered when printing
 - Coach tracking: each session supports multiple coaches via `session_coaches` join table; coaches managed in settings
 - Parent portal: `/view/[token]?year=YYYY` — no auth required, read-only, supports year navigation
 - CSV import auto-maps columns by keyword matching (Malay + English), includes duplicate name detection
 - Dashboard outstanding = all-time cumulative (not current month only) — students may pay late across months
 - Session deletion blocked when month has non-voided payments
-- All destructive actions (delete payments, receipts, sessions) require confirmation dialog
+- Student/coach deletion: hard delete with linked-record check (attendance/payments/refunds); blocked if records exist with toast suggesting deactivation
+- All destructive actions (delete payments, receipts, sessions, students, coaches) require confirmation dialog
 
 ## Architecture
 - `/src/app/login/` — Auth (login + signup)
