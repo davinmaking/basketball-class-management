@@ -20,7 +20,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Upload, Search, Pencil, Link2, Users } from "lucide-react";
+import { Plus, Upload, Search, Pencil, Link2, Users, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddStudentDialog } from "./add-student-dialog";
 import { CsvImportDialog } from "./csv-import-dialog";
@@ -38,6 +48,7 @@ export default function StudentsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showCsv, setShowCsv] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
   const supabase = createClient();
@@ -112,6 +123,49 @@ export default function StudentsPage() {
     const url = `${window.location.origin}/view/${token}`;
     navigator.clipboard.writeText(url);
     toast.success("家长链接已复制");
+  }
+
+  async function handleDelete() {
+    if (!deletingStudent) return;
+
+    const [attendance, payments, refunds] = await Promise.all([
+      supabase
+        .from("attendance")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", deletingStudent.id),
+      supabase
+        .from("payments")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", deletingStudent.id),
+      supabase
+        .from("refunds")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", deletingStudent.id),
+    ]);
+
+    const linkedCount =
+      (attendance.count ?? 0) + (payments.count ?? 0) + (refunds.count ?? 0);
+
+    if (linkedCount > 0) {
+      toast.error(
+        `无法删除，该学生有 ${linkedCount} 条关联记录（出勤/缴费/退费）。请改用停用功能。`
+      );
+      setDeletingStudent(null);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("students")
+      .delete()
+      .eq("id", deletingStudent.id);
+    if (error) {
+      toast.error("删除学生失败");
+      setDeletingStudent(null);
+      return;
+    }
+    toast.success("学生已删除");
+    setDeletingStudent(null);
+    fetchStudents();
   }
 
   return (
@@ -206,6 +260,7 @@ export default function StudentsPage() {
                     siblingGroups={siblingGroups}
                     onCopyLink={copyViewLink}
                     onEdit={setEditingStudent}
+                    onDelete={setDeletingStudent}
                   />
                 ))
               )}
@@ -237,6 +292,24 @@ export default function StudentsPage() {
             onSuccess={fetchStudents}
           />
         )}
+
+        <AlertDialog
+          open={!!deletingStudent}
+          onOpenChange={(open) => !open && setDeletingStudent(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除</AlertDialogTitle>
+              <AlertDialogDescription>
+                确定要删除学生「{deletingStudent?.name}」吗？此操作无法撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete}>删除</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );
@@ -249,11 +322,13 @@ function GroupedStudentRows({
   siblingGroups,
   onCopyLink,
   onEdit,
+  onDelete,
 }: {
   group: { className: string; students: Student[] };
   siblingGroups: Map<string, Student[]>;
   onCopyLink: (token: string | null) => void;
   onEdit: (student: Student) => void;
+  onDelete: (student: Student) => void;
 }) {
   return (
     <>
@@ -330,6 +405,15 @@ function GroupedStudentRows({
                 onClick={() => onEdit(student)}
               >
                 <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="删除"
+                className="text-destructive hover:text-destructive"
+                onClick={() => onDelete(student)}
+              >
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </TableCell>
