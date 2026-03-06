@@ -96,14 +96,11 @@ function wrapReportHtml(title: string, subtitle: string, bodyContent: string): s
     }
     .voided { text-decoration: line-through; color: #999; }
     @media print {
-      body { margin: 0; padding: 20px; }
+      body { margin: 0 auto; padding: 20px; }
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>${APP_CONFIG.schoolName}</h1>
-  </div>
   <div class="report-title">${title}</div>
   <div class="subtitle">${subtitle}</div>
   ${bodyContent}
