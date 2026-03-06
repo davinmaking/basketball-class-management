@@ -352,6 +352,7 @@ export default async function ParentViewPage({
                             <ParentReceiptButton
                               receiptNumber={receipt.receipt_number}
                               issuedAt={receipt.issued_at ?? ""}
+                              date={payment.payment_date}
                               studentName={student.name}
                               schoolClass={student.school_class}
                               amount={Number(payment.amount)}
@@ -412,6 +413,7 @@ export default async function ParentViewPage({
                             <ParentCreditNoteButton
                               creditNoteNumber={creditNote.credit_note_number}
                               issuedAt={creditNote.issued_at ?? ""}
+                              date={refund.refund_date}
                               studentName={student.name}
                               schoolClass={student.school_class}
                               amount={Number(refund.amount)}

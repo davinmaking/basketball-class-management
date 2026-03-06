@@ -4,6 +4,7 @@ import { APP_CONFIG } from "./config";
 interface ReceiptData {
   receiptNumber: string;
   issuedAt: string | null;
+  date?: string | null;
   studentName: string;
   schoolClass?: string | null;
   amount: number;
@@ -17,8 +18,9 @@ interface ReceiptData {
  * Generates receipt HTML in bilingual format (BM + Chinese).
  */
 export function generateReceiptHtml(data: ReceiptData): string {
-  const dateStr = data.issuedAt
-    ? format(parseISO(data.issuedAt), "dd/MM/yyyy")
+  const dateSource = data.date ?? data.issuedAt;
+  const dateStr = dateSource
+    ? format(parseISO(dateSource), "dd/MM/yyyy")
     : "-";
 
   const schoolClassRow = data.schoolClass
@@ -198,6 +200,7 @@ export function printReceiptHtml(data: ReceiptData): boolean {
 interface CreditNoteData {
   creditNoteNumber: string;
   issuedAt: string | null;
+  date?: string | null;
   studentName: string;
   schoolClass?: string | null;
   amount: number;
@@ -214,8 +217,9 @@ interface CreditNoteData {
  * Generates credit note HTML in bilingual format (BM + Chinese).
  */
 export function generateCreditNoteHtml(data: CreditNoteData): string {
-  const dateStr = data.issuedAt
-    ? format(parseISO(data.issuedAt), "dd/MM/yyyy")
+  const dateSource = data.date ?? data.issuedAt;
+  const dateStr = dateSource
+    ? format(parseISO(dateSource), "dd/MM/yyyy")
     : "-";
 
   const schoolClassRow = data.schoolClass

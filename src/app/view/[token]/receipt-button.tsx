@@ -8,6 +8,7 @@ import { toast } from "sonner";
 interface Props {
   receiptNumber: string;
   issuedAt: string;
+  date?: string | null;
   studentName: string;
   schoolClass?: string | null;
   amount: number;
@@ -20,6 +21,7 @@ interface Props {
 export function ParentReceiptButton({
   receiptNumber,
   issuedAt,
+  date,
   studentName,
   schoolClass,
   amount,
@@ -32,6 +34,7 @@ export function ParentReceiptButton({
     const success = printReceiptHtml({
       receiptNumber,
       issuedAt: issuedAt || null,
+      date,
       studentName,
       schoolClass,
       amount,

@@ -218,6 +218,7 @@ export function Receipts() {
     const success = printReceiptHtml({
       receiptNumber: receipt.receipt_number,
       issuedAt: receipt.issued_at,
+      date: receipt.payment_date,
       studentName: receipt.student_name,
       schoolClass: receipt.school_class,
       amount: Number(receipt.amount),
@@ -265,6 +266,7 @@ export function Receipts() {
     const success = printCreditNoteHtml({
       creditNoteNumber: cn.credit_note_number,
       issuedAt: cn.issued_at,
+      date: cn.refund_date,
       studentName: cn.student_name,
       schoolClass: cn.school_class,
       amount: Number(cn.amount),

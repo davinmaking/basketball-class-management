@@ -8,6 +8,7 @@ import { toast } from "sonner";
 interface Props {
   creditNoteNumber: string;
   issuedAt: string;
+  date?: string | null;
   studentName: string;
   schoolClass?: string | null;
   amount: number;
@@ -23,6 +24,7 @@ interface Props {
 export function ParentCreditNoteButton({
   creditNoteNumber,
   issuedAt,
+  date,
   studentName,
   schoolClass,
   amount,
@@ -38,6 +40,7 @@ export function ParentCreditNoteButton({
     const success = printCreditNoteHtml({
       creditNoteNumber,
       issuedAt: issuedAt || null,
+      date,
       studentName,
       schoolClass,
       amount,
