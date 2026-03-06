@@ -121,7 +121,7 @@ export function generateReceiptHtml(data: ReceiptData): string {
       line-height: 1.6;
     }
     @media print {
-      body { margin: 0; padding: 20px; }
+      body { margin: 0 auto; padding: 20px; }
     }
   </style>
 </head>
@@ -348,7 +348,7 @@ export function generateCreditNoteHtml(data: CreditNoteData): string {
       line-height: 1.6;
     }
     @media print {
-      body { margin: 0; padding: 20px; }
+      body { margin: 0 auto; padding: 20px; }
     }
   </style>
 </head>
