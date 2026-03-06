@@ -4,7 +4,7 @@
 Basketball training class management web app for coaches and parents.
 - **Stack**: Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Supabase
 - **Package manager**: npm
-- **Language**: UI text in Chinese (Simplified), code in English. WhatsApp messages in Bahasa Malaysia or Chinese based on student preference.
+- **Language**: UI text bilingual (Chinese + Malay) on public pages; Chinese on dashboard; code in English. WhatsApp messages in Bahasa Malaysia or Chinese based on student preference.
 
 ## Supabase
 - **Auth**: Email/password for coaches; token-based public URLs for parents
@@ -29,7 +29,8 @@ Basketball training class management web app for coaches and parents.
 - Credit note number format: `RTRN-{year}-{sequential}` (e.g. `RTRN-2026-001`)
 - Receipt/credit note format: bilingual (BM + Chinese), no school header, coach name as 收款人/退款人, student name shown, footer disclaimers, centered when printing
 - Coach tracking: each session supports multiple coaches via `session_coaches` join table; coaches managed in settings
-- Parent portal: `/view/[token]?year=YYYY` — no auth required, read-only, supports year navigation
+- Parent portal: `/view/[token]?year=YYYY` — no auth required, read-only, bilingual (Chinese + Malay), supports year navigation, back button to directory
+- Student directory: `/directory` — public page listing all active students grouped by class, searchable, links to individual parent portals
 - CSV import auto-maps columns by keyword matching (Malay + English), includes duplicate name detection
 - Dashboard outstanding = all-time cumulative (not current month only) — students may pay late across months
 - Session deletion blocked when month has non-voided payments
@@ -39,7 +40,8 @@ Basketball training class management web app for coaches and parents.
 ## Architecture
 - `/src/app/login/` — Auth (login + signup)
 - `/src/app/dashboard/` — Protected coach area (students, sessions, attendance, fees, receipts, reports); dashboard page shows stat cards + all-time outstanding students grouped by class
-- `/src/app/view/[token]/` — Public parent portal (server component)
+- `/src/app/directory/` — Public student directory (server + client component with search)
+- `/src/app/view/[token]/` — Public parent portal (server component, bilingual)
 - `/src/lib/config.ts` — Environment-based configuration (app name, school info, fee rate, currency)
 - `/src/lib/supabase/` — client.ts, server.ts, middleware.ts
 - `/src/lib/constants.ts` — MONTHS, DAYS_OF_WEEK
@@ -63,7 +65,8 @@ Basketball training class management web app for coaches and parents.
 - Stat card values use `tabular-nums tracking-tight` for clean number display
 - Student lists grouped by class use `groupStudentsByClass()` with class header rows (`bg-muted/50`, `colSpan` full width)
 - Page headings use `tracking-tight` for tighter typography
-- Login and parent portal use `min-h-[100dvh]` (not `min-h-screen`) with Dribbble brand icon
+- Login, parent portal, and directory use `min-h-[100dvh]` (not `min-h-screen`) with Dribbble brand icon
+- Public pages (parent portal, directory) use bilingual labels: "华语 / Malay" format (e.g. "余额 / Baki")
 
 ## Conventions
 - Date format in UI: `{year}年{month}月` (Chinese style)
