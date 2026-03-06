@@ -20,7 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Upload, Search, Pencil, Link2, Users, Trash2 } from "lucide-react";
+import { Plus, Upload, Search, Pencil, Link2, Users, Trash2, ExternalLink } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -174,6 +174,14 @@ export default function StudentsPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold tracking-tight">学生</h1>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("/directory", "_blank")}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              家长名册
+            </Button>
             <Button onClick={() => setShowCsv(true)} variant="outline" size="sm">
               <Upload className="h-4 w-4 mr-2" />
               导入CSV
