@@ -14,7 +14,7 @@ export default async function DirectoryPage() {
     .order("name");
 
   return (
-    <div className="min-h-[100dvh] bg-muted/30 p-4 md:p-8">
+    <main id="main-content" className="min-h-[100dvh] bg-muted/30 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="text-center space-y-2">
           <div className="mx-auto rounded-full bg-primary/10 p-3 w-fit">
@@ -30,6 +30,6 @@ export default async function DirectoryPage() {
 
         <StudentDirectory students={students ?? []} />
       </div>
-    </div>
+    </main>
   );
 }

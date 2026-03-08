@@ -224,7 +224,7 @@ export default function CoachesPage() {
               coaches.map((coach) => (
                 <TableRow
                   key={coach.id}
-                  className={!coach.active ? "opacity-60" : ""}
+                  className={!coach.active ? "text-muted-foreground" : ""}
                 >
                   <TableCell className="font-medium">{coach.name}</TableCell>
                   <TableCell>{coach.phone ?? "-"}</TableCell>

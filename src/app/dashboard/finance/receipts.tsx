@@ -366,7 +366,7 @@ export function Receipts() {
                     filtered.map((receipt) => {
                       const isVoided = receipt.voided || receipt.payment_voided;
                       return (
-                        <TableRow key={receipt.id} className={isVoided ? "opacity-50" : ""}>
+                        <TableRow key={receipt.id} className={isVoided ? "text-muted-foreground" : ""}>
                           <TableCell className={`font-mono text-sm whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {receipt.receipt_number}
                             {isVoided && (
@@ -469,7 +469,7 @@ export function Receipts() {
                     filteredCN.map((cn) => {
                       const isVoided = cn.voided || cn.refund_voided;
                       return (
-                        <TableRow key={cn.id} className={isVoided ? "opacity-50" : ""}>
+                        <TableRow key={cn.id} className={isVoided ? "text-muted-foreground" : ""}>
                           <TableCell className={`font-mono text-sm whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {cn.credit_note_number}
                             {isVoided && (

@@ -153,7 +153,7 @@ export default async function ParentViewPage({
   const totalPaid = monthlySummaries.reduce((s, m) => s + m.paid, 0);
 
   return (
-    <div className="min-h-[100dvh] bg-muted/30 p-4 md:p-8">
+    <main id="main-content" className="min-h-[100dvh] bg-muted/30 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <div>
           <Link href="/directory">
@@ -197,14 +197,14 @@ export default async function ParentViewPage({
         {/* Year Navigation */}
         <div className="flex items-center justify-center gap-3">
           <Link href={`/view/${token}?year=${displayYear - 1}`}>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" aria-label={`查看${displayYear - 1}年`}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </Link>
           <span className="text-lg font-semibold">{displayYear}年</span>
           {displayYear < nowYear && (
             <Link href={`/view/${token}?year=${displayYear + 1}`}>
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" aria-label={`查看${displayYear + 1}年`}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </Link>
@@ -236,7 +236,7 @@ export default async function ParentViewPage({
                 <CardTitle className="text-sm">已退费 / Dikembalikan</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold tracking-tight tabular-nums text-blue-600">
+                <div className="text-2xl font-bold tracking-tight tabular-nums text-info">
                   {APP_CONFIG.currency} {totalRefunded.toFixed(2)}
                 </div>
               </CardContent>
@@ -336,11 +336,11 @@ export default async function ParentViewPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(payments ?? []).map((payment: any) => {
+                  {(payments ?? []).map((payment) => {
                     const receipt = receiptMap.get(payment.id);
                     const isVoided = payment.voided;
                     return (
-                      <TableRow key={payment.id} className={isVoided ? "opacity-50" : ""}>
+                      <TableRow key={payment.id} className={isVoided ? "text-muted-foreground" : ""}>
                         <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                           {format(parseISO(payment.payment_date), "dd/MM/yyyy")}
                         </TableCell>
@@ -399,8 +399,8 @@ export default async function ParentViewPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(refunds ?? []).map((refund: any) => {
-                    const creditNote = (refund.credit_notes as any[])?.[0];
+                  {(refunds ?? []).map((refund) => {
+                    const creditNote = refund.credit_notes?.[0];
                     return (
                       <TableRow key={refund.id}>
                         <TableCell className="whitespace-nowrap">
@@ -450,6 +450,6 @@ export default async function ParentViewPage({
         </p>
 
       </div>
-    </div>
+    </main>
   );
 }

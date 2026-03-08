@@ -3,11 +3,7 @@ import { Dribbble, CalendarDays, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { APP_CONFIG } from "@/lib/config";
-
-const MALAY_MONTHS = [
-  "Januari", "Februari", "Mac", "April", "Mei", "Jun",
-  "Julai", "Ogos", "September", "Oktober", "November", "Disember",
-];
+import { MALAY_MONTHS } from "@/lib/constants";
 
 const DAY_LABELS: Record<number, string> = {
   0: "星期日 / Ahad",
@@ -61,7 +57,7 @@ export default async function SchedulePage() {
   const totalSessions = sessions?.length ?? 0;
 
   return (
-    <div className="min-h-[100dvh] bg-muted/30 p-4 md:p-8">
+    <main id="main-content" className="min-h-[100dvh] bg-muted/30 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="text-center space-y-2">
           <div className="mx-auto rounded-full bg-primary/10 p-3 w-fit">
@@ -88,7 +84,7 @@ export default async function SchedulePage() {
             const isPast = key < todayStr.slice(0, 7);
 
             return (
-              <Card key={key} className={isPast ? "opacity-60" : ""}>
+              <Card key={key} className={isPast ? "text-muted-foreground" : ""}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
@@ -113,7 +109,7 @@ export default async function SchedulePage() {
                             isToday
                               ? "bg-primary/10 ring-1 ring-primary font-semibold"
                               : d.completed
-                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                              ? "bg-success/10 text-success"
                               : isPastDate
                               ? "bg-muted/30 text-muted-foreground"
                               : "bg-muted/50"
@@ -121,7 +117,7 @@ export default async function SchedulePage() {
                         >
                           <span className="flex items-center gap-2">
                             {d.completed && (
-                              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                              <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
                             )}
                             {formatted}（{DAY_LABELS[d.day]}）
                           </span>
@@ -149,6 +145,6 @@ export default async function SchedulePage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

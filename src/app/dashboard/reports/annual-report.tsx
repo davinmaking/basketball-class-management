@@ -219,7 +219,7 @@ export function AnnualReport() {
             <Card>
               <CardContent className="pt-6 text-center">
                 <div className="text-sm text-muted-foreground">年度总收入</div>
-                <div className="text-xl font-bold text-green-600">
+                <div className="text-xl font-bold text-success">
                   {fmt(yearTotals.totalPayments)}
                 </div>
               </CardContent>
@@ -227,7 +227,7 @@ export function AnnualReport() {
             <Card>
               <CardContent className="pt-6 text-center">
                 <div className="text-sm text-muted-foreground">年度总支出</div>
-                <div className="text-xl font-bold text-red-600">
+                <div className="text-xl font-bold text-destructive">
                   {fmt(yearTotals.totalExpenses)}
                 </div>
               </CardContent>
@@ -236,7 +236,7 @@ export function AnnualReport() {
               <CardContent className="pt-6 text-center">
                 <div className="text-sm text-muted-foreground">年度净收入</div>
                 <div
-                  className={`text-xl font-bold ${yearTotals.netIncome >= 0 ? "text-green-600" : "text-red-600"}`}
+                  className={`text-xl font-bold ${yearTotals.netIncome >= 0 ? "text-success" : "text-destructive"}`}
                 >
                   {fmt(yearTotals.netIncome)}
                 </div>
@@ -246,7 +246,7 @@ export function AnnualReport() {
               <CardContent className="pt-6 text-center">
                 <div className="text-sm text-muted-foreground">未收余额</div>
                 <div
-                  className={`text-xl font-bold ${outstandingBalance > 0 ? "text-red-600" : "text-green-600"}`}
+                  className={`text-xl font-bold ${outstandingBalance > 0 ? "text-destructive" : "text-success"}`}
                 >
                   {fmt(outstandingBalance)}
                 </div>
@@ -364,7 +364,7 @@ export function AnnualReport() {
                             {expenses > 0 ? fmt(expenses) : "-"}
                           </TableCell>
                           <TableCell
-                            className={`text-right whitespace-nowrap font-medium ${m.netIncome >= 0 ? "text-green-600" : "text-red-600"}`}
+                            className={`text-right whitespace-nowrap font-medium ${m.netIncome >= 0 ? "text-success" : "text-destructive"}`}
                           >
                             {fmt(m.netIncome)}
                           </TableCell>
@@ -380,7 +380,7 @@ export function AnnualReport() {
                         {fmt(yearTotals.totalExpenses)}
                       </TableCell>
                       <TableCell
-                        className={`text-right whitespace-nowrap ${yearTotals.netIncome >= 0 ? "text-green-600" : "text-red-600"}`}
+                        className={`text-right whitespace-nowrap ${yearTotals.netIncome >= 0 ? "text-success" : "text-destructive"}`}
                       >
                         {fmt(yearTotals.netIncome)}
                       </TableCell>
@@ -400,7 +400,7 @@ export function AnnualReport() {
                   学生未缴总额（应收 - 已收）
                 </div>
                 <div
-                  className={`text-2xl font-bold ${outstandingBalance > 0 ? "text-red-600" : "text-green-600"}`}
+                  className={`text-2xl font-bold ${outstandingBalance > 0 ? "text-destructive" : "text-success"}`}
                 >
                   {fmt(outstandingBalance)}
                 </div>

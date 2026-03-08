@@ -808,7 +808,7 @@ export function StudentFees() {
             <CardTitle className="text-sm font-medium">余额</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${totalBalance >= 0 ? "text-green-600" : "text-destructive"}`}>
+            <div className={`text-2xl font-bold ${totalBalance >= 0 ? "text-success" : "text-destructive"}`}>
               {APP_CONFIG.currency} {totalBalance.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -895,7 +895,7 @@ export function StudentFees() {
                       <div
                         key={payment.id}
                         className={`border rounded-lg p-3 ${
-                          payment.voided ? "opacity-50" : ""
+                          payment.voided ? "text-muted-foreground" : ""
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -966,13 +966,13 @@ export function StudentFees() {
                     return (
                       <div
                         key={refund.id}
-                        className={`border rounded-lg p-3 border-blue-200 ${
-                          refund.voided ? "opacity-50" : ""
+                        className={`border rounded-lg p-3 border-info/30 ${
+                          refund.voided ? "text-muted-foreground" : ""
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                            <Badge variant="secondary" className="bg-info/10 text-info">
                               退费
                             </Badge>
                             <span className={`font-medium ${refund.voided ? "line-through" : ""}`}>
@@ -1145,7 +1145,7 @@ export function StudentFees() {
                 )}
                 <div className="flex justify-between border-t pt-1 font-medium">
                   <span>可退金额:</span>
-                  <span className="text-blue-600">
+                  <span className="text-info">
                     {APP_CONFIG.currency} {refundCalc.refundable.toFixed(2)}
                   </span>
                 </div>
@@ -1400,7 +1400,7 @@ function FeeGroupRows({
             <span
               className={
                 row.balance > 0
-                  ? "text-green-600"
+                  ? "text-success"
                   : row.balance < 0
                   ? "text-destructive"
                   : ""
@@ -1443,7 +1443,7 @@ function FeeGroupRows({
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <MessageCircle className="h-4 w-4 text-green-600" />
+                      <MessageCircle className="h-4 w-4 text-success" />
                     </a>
                   </Button>
                 </div>
@@ -1452,7 +1452,7 @@ function FeeGroupRows({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-blue-600 border-blue-200"
+                  className="text-info border-info/30"
                   onClick={() => onOpenRefund(row.student)}
                 >
                   <Undo2 className="h-4 w-4 mr-1" />

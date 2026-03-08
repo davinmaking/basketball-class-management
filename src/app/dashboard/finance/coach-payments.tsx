@@ -300,7 +300,7 @@ export function CoachPayments() {
                 </TableRow>
               ) : (
                 coachPayments.map((cp) => (
-                  <TableRow key={cp.id} className={cp.voided ? "opacity-50" : ""}>
+                  <TableRow key={cp.id} className={cp.voided ? "text-muted-foreground" : ""}>
                     <TableCell className={cp.voided ? "line-through" : ""}>
                       {cp.coach.name}
                     </TableCell>

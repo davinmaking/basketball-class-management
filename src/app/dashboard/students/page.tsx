@@ -351,13 +351,13 @@ function GroupedStudentRows({
 
       {/* Student rows */}
       {group.students.map((student) => (
-        <TableRow key={student.id} className={student.active === false ? "opacity-60" : ""}>
+        <TableRow key={student.id} className={student.active === false ? "text-muted-foreground" : ""}>
           <TableCell className="font-medium">
             {student.name}
             {siblingGroups.has(student.id) && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="inline-flex items-center gap-1 ml-2 text-blue-600 cursor-default">
+                  <span className="inline-flex items-center gap-1 ml-2 text-info cursor-default">
                     <Users className="h-3.5 w-3.5" />
                     <span className="text-xs">
                       兄弟姐妹({siblingGroups.get(student.id)!.length})
@@ -402,6 +402,7 @@ function GroupedStudentRows({
                 variant="ghost"
                 size="icon"
                 title="复制家长链接"
+                aria-label={`复制${student.name}的家长链接`}
                 onClick={() => onCopyLink(student.view_token)}
               >
                 <Link2 className="h-4 w-4" />
@@ -410,6 +411,7 @@ function GroupedStudentRows({
                 variant="ghost"
                 size="icon"
                 title="编辑"
+                aria-label={`编辑${student.name}`}
                 onClick={() => onEdit(student)}
               >
                 <Pencil className="h-4 w-4" />
@@ -418,6 +420,7 @@ function GroupedStudentRows({
                 variant="ghost"
                 size="icon"
                 title="删除"
+                aria-label={`删除${student.name}`}
                 className="text-destructive hover:text-destructive"
                 onClick={() => onDelete(student)}
               >

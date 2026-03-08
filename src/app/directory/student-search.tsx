@@ -35,6 +35,7 @@ export function StudentDirectory({
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
+          aria-label="搜索学生姓名 / Cari nama pelajar"
           placeholder="搜索学生姓名 / Cari nama pelajar..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -43,7 +44,7 @@ export function StudentDirectory({
       </div>
 
       {/* Count */}
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
         共 {filtered.length} 名学生 / {filtered.length} pelajar
         {search &&
           filtered.length !== students.length &&

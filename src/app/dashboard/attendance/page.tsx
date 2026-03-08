@@ -474,12 +474,13 @@ export default function AttendancePage() {
           </div>
 
           {/* Calendar grid */}
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border rounded-lg overflow-hidden" role="grid" aria-label="出勤日历">
             {/* Day headers */}
-            <div className="grid grid-cols-7 border-b bg-muted/50">
+            <div className="grid grid-cols-7 border-b bg-muted/50" role="row">
               {CAL_HEADERS.map((d) => (
                 <div
                   key={d}
+                  role="columnheader"
                   className="py-1.5 text-center text-xs font-medium text-muted-foreground"
                 >
                   {d}
@@ -515,6 +516,8 @@ export default function AttendancePage() {
                   return (
                     <button
                       key={dateStr}
+                      role="gridcell"
+                      aria-label={`${format(day, "yyyy年M月d日")}${hasAttendance ? "（已记录出勤）" : hasSession ? "（有课程）" : ""}`}
                       onClick={() => inMonth && handleDateClick(day)}
                       disabled={!inMonth}
                       className={`
@@ -789,7 +792,16 @@ function GroupRows({
       {/* Group header row */}
       <TableRow
         className="cursor-pointer hover:bg-muted/50"
+        role="button"
+        tabIndex={0}
+        aria-expanded={!isCollapsed}
         onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
       >
         <TableCell colSpan={5} className="py-2">
           <div className="flex items-center gap-1 text-sm font-semibold">

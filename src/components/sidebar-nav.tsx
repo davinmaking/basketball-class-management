@@ -50,6 +50,15 @@ export function SidebarNav() {
     if (stored === "true") setCollapsed(true);
   }, []);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMobileOpen(false);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [mobileOpen]);
+
   function toggleCollapsed() {
     setCollapsed((prev) => {
       const next = !prev;
@@ -72,6 +81,8 @@ export function SidebarNav() {
         <Button
           variant="ghost"
           size="icon"
+          aria-label={mobileOpen ? "关闭菜单" : "打开菜单"}
+          aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(!mobileOpen)}
         >
           {mobileOpen ? (
@@ -174,6 +185,7 @@ export function SidebarNav() {
                     variant="ghost"
                     size="icon"
                     className="w-full"
+                    aria-label="展开侧栏"
                     onClick={toggleCollapsed}
                   >
                     <PanelLeftOpen className="h-4 w-4" />
@@ -201,6 +213,7 @@ export function SidebarNav() {
                   variant="ghost"
                   size="icon"
                   className="w-full text-muted-foreground"
+                  aria-label="退出登录"
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4" />

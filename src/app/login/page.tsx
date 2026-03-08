@@ -60,7 +60,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center p-4 bg-muted/30">
+    <main id="main-content" className="min-h-[100dvh] flex items-center justify-center p-4 bg-muted/30">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto rounded-full bg-primary/10 p-3 w-fit">
@@ -98,8 +98,8 @@ export default function LoginPage() {
                 minLength={6}
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {message && <p className="text-sm text-green-600">{message}</p>}
+            {error && <p className="text-sm text-destructive" role="alert" aria-live="assertive">{error}</p>}
+            {message && <p className="text-sm text-success" role="status" aria-live="polite">{message}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading
                 ? isSignUp
@@ -127,6 +127,6 @@ export default function LoginPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

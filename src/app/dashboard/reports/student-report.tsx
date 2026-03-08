@@ -276,20 +276,20 @@ export function StudentReport() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <div className="text-sm text-muted-foreground">付款总额</div>
-                  <div className="text-lg font-bold text-green-600">
+                  <div className="text-lg font-bold text-success">
                     {APP_CONFIG.currency} {totalPaid.toFixed(2)}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">退费总额</div>
-                  <div className="text-lg font-bold text-red-600">
+                  <div className="text-lg font-bold text-destructive">
                     {APP_CONFIG.currency} {totalRefunded.toFixed(2)}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">净额</div>
                   <div
-                    className={`text-lg font-bold ${netAmount >= 0 ? "text-green-600" : "text-red-600"}`}
+                    className={`text-lg font-bold ${netAmount >= 0 ? "text-success" : "text-destructive"}`}
                   >
                     {APP_CONFIG.currency} {netAmount.toFixed(2)}
                   </div>

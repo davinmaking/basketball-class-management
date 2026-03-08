@@ -162,7 +162,7 @@ export function MonthlyReport() {
             <Card>
               <CardContent className="pt-6 text-center">
                 <div className="text-sm text-muted-foreground">总收入</div>
-                <div className="text-xl font-bold text-green-600">
+                <div className="text-xl font-bold text-success">
                   {APP_CONFIG.currency} {totalPayments.toFixed(2)}
                 </div>
               </CardContent>
@@ -170,7 +170,7 @@ export function MonthlyReport() {
             <Card>
               <CardContent className="pt-6 text-center">
                 <div className="text-sm text-muted-foreground">总支出</div>
-                <div className="text-xl font-bold text-red-600">
+                <div className="text-xl font-bold text-destructive">
                   {APP_CONFIG.currency} {totalRefunds.toFixed(2)}
                 </div>
               </CardContent>
@@ -179,7 +179,7 @@ export function MonthlyReport() {
               <CardContent className="pt-6 text-center">
                 <div className="text-sm text-muted-foreground">净收入</div>
                 <div
-                  className={`text-xl font-bold ${netIncome >= 0 ? "text-green-600" : "text-red-600"}`}
+                  className={`text-xl font-bold ${netIncome >= 0 ? "text-success" : "text-destructive"}`}
                 >
                   {APP_CONFIG.currency} {netIncome.toFixed(2)}
                 </div>

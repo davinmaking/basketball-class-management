@@ -6,3 +6,8 @@ export const MONTHS = [
 export const DAYS_OF_WEEK = [
   "星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六",
 ];
+
+export const MALAY_MONTHS = [
+  "Januari", "Februari", "Mac", "April", "Mei", "Jun",
+  "Julai", "Ogos", "September", "Oktober", "November", "Disember",
+];
