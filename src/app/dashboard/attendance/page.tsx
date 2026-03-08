@@ -34,6 +34,7 @@ import {
   ChevronRight,
   Plus,
   CalendarPlus,
+  ExternalLink,
   ChevronDown,
   ChevronRight as ChevronRightIcon,
 } from "lucide-react";
@@ -421,6 +422,14 @@ export default function AttendancePage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl font-bold tracking-tight">出勤</h1>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open("/schedule", "_blank")}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            家长时间表
+          </Button>
           <Button
             onClick={() => setShowBulk(true)}
             variant="outline"
