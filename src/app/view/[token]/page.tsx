@@ -146,7 +146,9 @@ export default async function ParentViewPage({
     0
   );
 
-  // Calculate monthly summaries
+  // Calculate monthly summaries with RUNNING balance so overpayment in earlier
+  // months naturally carries forward to offset later months' charges.
+  let runningBalance = 0;
   const monthlySummaries = Array.from({ length: 12 }, (_, i) => {
     const month = i + 1;
     const monthSessions = (sessions ?? []).filter((s) => {
@@ -167,13 +169,15 @@ export default async function ParentViewPage({
       .filter((p) => p.month === month && !p.voided)
       .reduce((s, p) => s + Number(p.amount), 0);
 
+    runningBalance += paid - due;
+
     return {
       month,
       totalSessions: monthSessions.length,
       attended,
       due,
       paid,
-      balance: paid - due,
+      balance: runningBalance, // cumulative through end of this month (within displayYear)
     };
   }).filter((m) => m.totalSessions > 0 || m.paid > 0);
 
@@ -299,7 +303,12 @@ export default async function ParentViewPage({
                   <TableHead className="text-center">出勤 / Hadir</TableHead>
                   <TableHead className="text-right">费用 / Yuran</TableHead>
                   <TableHead className="text-right">已支付 / Dibayar</TableHead>
-                  <TableHead className="text-right">余额 / Baki</TableHead>
+                  <TableHead
+                    className="text-right"
+                    title="截至该月末的累计余额 / Baki terkumpul sehingga akhir bulan"
+                  >
+                    累计余额 / Baki
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

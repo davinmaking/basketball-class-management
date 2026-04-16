@@ -97,14 +97,15 @@ interface RefundCalc {
 interface FeeRow {
   student: Student;
   sessionsAttended: number;
-  amountDue: number;
-  totalPaid: number;
-  balance: number;
+  amountDue: number; // this month's chargeable amount
+  totalPaid: number; // this month's payments
+  monthBalance: number; // paid - due, for THIS month's activity only
+  balance: number; // CUMULATIVE: paid-to-date - due-to-date (through end of selected month)
 }
 
 interface ArrearsEntry {
   student: Student;
-  amount: number; // positive number representing outstanding from prior months
+  amount: number; // positive number; interpreted as owing or credit based on which list it's in
 }
 
 function getWhatsAppUrl(
@@ -141,6 +142,7 @@ function getWhatsAppUrl(
 export function StudentFees() {
   const [feeData, setFeeData] = useState<FeeRow[]>([]);
   const [arrears, setArrears] = useState<ArrearsEntry[]>([]);
+  const [priorCredits, setPriorCredits] = useState<ArrearsEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -156,6 +158,11 @@ export function StudentFees() {
   // Owing per (year-month) for the student being paid, used to show "欠 RM X" hints
   const [studentOwingByKey, setStudentOwingByKey] = useState<Record<string, number>>({});
   const [loadingOwing, setLoadingOwing] = useState(false);
+  // Quick-fill form state
+  const [quickArrearsTotal, setQuickArrearsTotal] = useState("");
+  const [quickEvenStart, setQuickEvenStart] = useState<number>(1);
+  const [quickEvenEnd, setQuickEvenEnd] = useState<number>(12);
+  const [quickEvenAmount, setQuickEvenAmount] = useState("");
 
   // Coaches
   const [coaches, setCoaches] = useState<Coach[]>([]);
@@ -206,7 +213,19 @@ export function StudentFees() {
     const endYear = selectedMonth === 11 ? selectedYear + 1 : selectedYear;
     const endDate = `${endYear}-${String(endMonth).padStart(2, "0")}-01`;
 
-    const [studentsRes, sessionsRes, paymentsRes] = await Promise.all([
+    // Fetch everything in parallel:
+    // - students (all)
+    // - this month's sessions (for current activity)
+    // - prior sessions (for cumulative baseline)
+    // - this month's payments
+    // - prior payments
+    const [
+      studentsRes,
+      curSessionsRes,
+      priorSessionsRes,
+      curPaymentsRes,
+      priorPaymentsRes,
+    ] = await Promise.all([
       supabase.from("students").select("*").order("name"),
       supabase
         .from("class_sessions")
@@ -214,49 +233,91 @@ export function StudentFees() {
         .gte("session_date", startDate)
         .lt("session_date", endDate),
       supabase
+        .from("class_sessions")
+        .select("id")
+        .lt("session_date", startDate),
+      supabase
         .from("payments")
         .select("student_id, amount")
         .eq("month", month)
         .eq("year", selectedYear)
         .eq("voided", false),
+      supabase
+        .from("payments")
+        .select("student_id, amount")
+        .eq("voided", false)
+        .or(
+          `year.lt.${selectedYear},and(year.eq.${selectedYear},month.lt.${month})`
+        ),
     ]);
 
     const students = studentsRes.data ?? [];
-    const sessionIds = (sessionsRes.data ?? []).map((s) => s.id);
+    const curSessionIds = (curSessionsRes.data ?? []).map((s) => s.id);
+    const priorSessionIds = (priorSessionsRes.data ?? []).map((s) => s.id);
 
-    // Get attendance for this month's sessions (only count chargeable: present AND NOT fee_exempt)
-    let attendanceCounts: Record<string, number> = {};
-    if (sessionIds.length > 0) {
-      const { data: attendanceData } = await supabase
+    // Count chargeable attendance (present AND NOT fee_exempt) per student for each scope
+    const currentAttendance: Record<string, number> = {};
+    if (curSessionIds.length > 0) {
+      const { data } = await supabase
         .from("attendance")
         .select("student_id")
-        .in("session_id", sessionIds)
+        .in("session_id", curSessionIds)
         .eq("present", true)
         .eq("fee_exempt", false);
-
-      (attendanceData ?? []).forEach((a) => {
-        attendanceCounts[a.student_id] = (attendanceCounts[a.student_id] ?? 0) + 1;
+      (data ?? []).forEach((a) => {
+        currentAttendance[a.student_id] =
+          (currentAttendance[a.student_id] ?? 0) + 1;
       });
     }
 
-    // Sum payments per student
-    const paymentSums: Record<string, number> = {};
-    (paymentsRes.data ?? []).forEach((p) => {
-      paymentSums[p.student_id] = (paymentSums[p.student_id] ?? 0) + Number(p.amount);
+    const priorDueByStudent: Record<string, number> = {};
+    if (priorSessionIds.length > 0) {
+      const { data } = await supabase
+        .from("attendance")
+        .select("student_id")
+        .in("session_id", priorSessionIds)
+        .eq("present", true)
+        .eq("fee_exempt", false);
+      (data ?? []).forEach((a) => {
+        priorDueByStudent[a.student_id] =
+          (priorDueByStudent[a.student_id] ?? 0) + APP_CONFIG.feePerSession;
+      });
+    }
+
+    const currentPaid: Record<string, number> = {};
+    (curPaymentsRes.data ?? []).forEach((p) => {
+      currentPaid[p.student_id] =
+        (currentPaid[p.student_id] ?? 0) + Number(p.amount);
+    });
+
+    const priorPaidByStudent: Record<string, number> = {};
+    (priorPaymentsRes.data ?? []).forEach((p) => {
+      priorPaidByStudent[p.student_id] =
+        (priorPaidByStudent[p.student_id] ?? 0) + Number(p.amount);
     });
 
     const rows: FeeRow[] = students
       .filter((s) => s.active !== false)
       .map((student) => {
-        const sessionsAttended = attendanceCounts[student.id] ?? 0;
+        const sessionsAttended = currentAttendance[student.id] ?? 0;
         const amountDue = sessionsAttended * APP_CONFIG.feePerSession;
-        const totalPaid = paymentSums[student.id] ?? 0;
-        const balance = totalPaid - amountDue;
-
-        return { student, sessionsAttended, amountDue, totalPaid, balance };
+        const totalPaid = currentPaid[student.id] ?? 0;
+        const priorDue = priorDueByStudent[student.id] ?? 0;
+        const priorPaid = priorPaidByStudent[student.id] ?? 0;
+        const monthBalance = totalPaid - amountDue;
+        // Cumulative balance accounts for carry-forward in both directions:
+        // a student who overpaid in March automatically has that credit reflected here.
+        const balance = totalPaid + priorPaid - (amountDue + priorDue);
+        return {
+          student,
+          sessionsAttended,
+          amountDue,
+          totalPaid,
+          monthBalance,
+          balance,
+        };
       });
 
-    // Sort by school_class (nulls last), then by student name
     rows.sort((a, b) => {
       const classA = a.student.school_class || "\uffff";
       const classB = b.student.school_class || "\uffff";
@@ -267,66 +328,37 @@ export function StudentFees() {
 
     setFeeData(rows);
 
-    // Compute historical arrears (net unpaid balance from BEFORE the selected month)
-    const priorSessionsRes = await supabase
-      .from("class_sessions")
-      .select("id")
-      .lt("session_date", startDate);
-    const priorSessionIds = (priorSessionsRes.data ?? []).map((s) => s.id);
-
-    const dueByStudent: Record<string, number> = {};
-    if (priorSessionIds.length > 0) {
-      const { data: priorAtt } = await supabase
-        .from("attendance")
-        .select("student_id")
-        .eq("present", true)
-        .eq("fee_exempt", false)
-        .in("session_id", priorSessionIds);
-      (priorAtt ?? []).forEach((a) => {
-        dueByStudent[a.student_id] =
-          (dueByStudent[a.student_id] ?? 0) + APP_CONFIG.feePerSession;
-      });
-    }
-
-    // Prior payments: (year < selectedYear) OR (year = selectedYear AND month < month)
-    const { data: priorPayData } = await supabase
-      .from("payments")
-      .select("student_id, amount, year, month")
-      .eq("voided", false)
-      .or(
-        `year.lt.${selectedYear},and(year.eq.${selectedYear},month.lt.${month})`
-      );
-
-    const paidByStudent: Record<string, number> = {};
-    (priorPayData ?? []).forEach((p) => {
-      paidByStudent[p.student_id] =
-        (paidByStudent[p.student_id] ?? 0) + Number(p.amount);
-    });
-
+    // Prior-month carry-forward: split into arrears (owing) and credits (overpaid)
     const studentById = new Map<string, Student>(students.map((s) => [s.id, s]));
     const arrearsList: ArrearsEntry[] = [];
+    const creditsList: ArrearsEntry[] = [];
     const seen = new Set<string>([
-      ...Object.keys(dueByStudent),
-      ...Object.keys(paidByStudent),
+      ...Object.keys(priorDueByStudent),
+      ...Object.keys(priorPaidByStudent),
     ]);
     seen.forEach((sid) => {
       const st = studentById.get(sid);
       if (!st || st.active === false) return;
-      const due = dueByStudent[sid] ?? 0;
-      const paid = paidByStudent[sid] ?? 0;
-      const balance = paid - due; // negative = owes
-      if (balance < -0.009) {
-        arrearsList.push({ student: st, amount: Math.abs(balance) });
+      const due = priorDueByStudent[sid] ?? 0;
+      const paid = priorPaidByStudent[sid] ?? 0;
+      const priorBalance = paid - due;
+      if (priorBalance < -0.009) {
+        arrearsList.push({ student: st, amount: Math.abs(priorBalance) });
+      } else if (priorBalance > 0.009) {
+        creditsList.push({ student: st, amount: priorBalance });
       }
     });
-    arrearsList.sort((a, b) => {
+    const sortFn = (a: ArrearsEntry, b: ArrearsEntry) => {
       const classA = a.student.school_class || "\uffff";
       const classB = b.student.school_class || "\uffff";
       const c = classA.localeCompare(classB, "zh");
       if (c !== 0) return c;
       return a.student.name.localeCompare(b.student.name, "zh");
-    });
+    };
+    arrearsList.sort(sortFn);
+    creditsList.sort(sortFn);
     setArrears(arrearsList);
+    setPriorCredits(creditsList);
 
     setLoading(false);
   }, [supabase, selectedMonth, selectedYear]);
@@ -357,6 +389,11 @@ export function StudentFees() {
         amount: suggestedAmount > 0 ? suggestedAmount.toFixed(2) : "",
       },
     ]);
+    // Reset quick-fill inputs
+    setQuickArrearsTotal(suggestedAmount > 0 ? suggestedAmount.toFixed(2) : "");
+    setQuickEvenStart(1);
+    setQuickEvenEnd(12);
+    setQuickEvenAmount("");
     setShowPayment(true);
     setStudentOwingByKey({});
     setLoadingOwing(true);
@@ -452,6 +489,83 @@ export function StudentFees() {
 
   function removeAllocation(idx: number) {
     setAllocations((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  // Quick-fill: distribute a total amount to oldest-owed months first, leftover → current month.
+  // If nothing is owed, the entire total lands on the current month as credit.
+  function applyArrearsFill() {
+    const total = parseFloat(quickArrearsTotal);
+    if (isNaN(total) || total <= 0) {
+      toast.error("请输入有效总金额");
+      return;
+    }
+
+    // Collect owed (year, month, owedAmount) from precomputed owing map, oldest first
+    const owed: { year: number; month: number; amount: number }[] = [];
+    Object.entries(studentOwingByKey).forEach(([key, bal]) => {
+      if (bal < -0.009) {
+        const [yStr, mStr] = key.split("-");
+        owed.push({ year: Number(yStr), month: Number(mStr), amount: Math.abs(bal) });
+      }
+    });
+    owed.sort((a, b) => (a.year === b.year ? a.month - b.month : a.year - b.year));
+
+    const out: Allocation[] = [];
+    let remaining = total;
+    for (const row of owed) {
+      if (remaining <= 0.009) break;
+      const amt = Math.min(remaining, row.amount);
+      out.push({ month: row.month, year: row.year, amount: amt.toFixed(2) });
+      remaining -= amt;
+    }
+
+    // Any leftover goes to the currently selected month as credit
+    if (remaining > 0.009) {
+      const existingIdx = out.findIndex(
+        (a) => a.year === selectedYear && a.month === selectedMonth + 1
+      );
+      if (existingIdx >= 0) {
+        out[existingIdx].amount = (
+          parseFloat(out[existingIdx].amount) + remaining
+        ).toFixed(2);
+      } else {
+        out.push({
+          month: selectedMonth + 1,
+          year: selectedYear,
+          amount: remaining.toFixed(2),
+        });
+      }
+    }
+
+    if (out.length === 0) {
+      // Shouldn't happen (remaining > 0 path above always pushes), but be defensive
+      toast.error("无法自动分配");
+      return;
+    }
+
+    setAllocations(out);
+    toast.success(`已分配到 ${out.length} 个月份`);
+  }
+
+  // Quick-fill: even distribution across a month range (年缴/季缴 scenarios)
+  function applyEvenFill() {
+    const per = parseFloat(quickEvenAmount);
+    if (isNaN(per) || per <= 0) {
+      toast.error("请输入有效单月金额");
+      return;
+    }
+    if (quickEvenStart > quickEvenEnd) {
+      toast.error("起始月份不能晚于结束月份");
+      return;
+    }
+
+    const out: Allocation[] = [];
+    for (let m = quickEvenStart; m <= quickEvenEnd; m++) {
+      out.push({ month: m, year: selectedYear, amount: per.toFixed(2) });
+    }
+
+    setAllocations(out);
+    toast.success(`已生成 ${out.length} 行，共 ${APP_CONFIG.currency}${(per * out.length).toFixed(2)}`);
   }
 
   const allocationsTotal = allocations.reduce((s, a) => {
@@ -1137,42 +1251,75 @@ export function StudentFees() {
         </Card>
       </div>
 
-      {arrears.length > 0 && (
-        <Card className="mb-4 border-destructive/30 bg-destructive/5">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                历史欠费结转 / Tunggakan Dari Bulan Lepas
-              </CardTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                截至 {selectedYear}年{selectedMonth + 1}月 前尚未结清
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-muted-foreground">合计</div>
-              <div className="font-bold tabular-nums text-destructive">
-                {APP_CONFIG.currency}{" "}
-                {arrears.reduce((s, a) => s + a.amount, 0).toFixed(2)}
-              </div>
-            </div>
+      {(arrears.length > 0 || priorCredits.length > 0) && (
+        <Card className="mb-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              历史结转 / Baki Bawa Hadapan
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              截至 {selectedYear}年{selectedMonth + 1}月 前的累计净值（点姓名查看记录）
+            </p>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-wrap gap-2">
-              {arrears.map((a) => (
-                <button
-                  key={a.student.id}
-                  type="button"
-                  onClick={() => openHistory(a.student)}
-                  className="inline-flex items-center gap-2 text-xs rounded-full border border-destructive/30 bg-background px-3 py-1 hover:bg-destructive/10 transition-colors"
-                >
-                  <span className="font-medium">{a.student.name}</span>
-                  <span className="text-destructive tabular-nums">
-                    {APP_CONFIG.currency} {a.amount.toFixed(2)}
+          <CardContent className="pt-0 space-y-3">
+            {arrears.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-destructive uppercase tracking-wide">
+                    欠费 / Tunggakan
                   </span>
-                </button>
-              ))}
-            </div>
+                  <span className="text-xs tabular-nums text-destructive">
+                    合计 {APP_CONFIG.currency}{" "}
+                    {arrears.reduce((s, a) => s + a.amount, 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {arrears.map((a) => (
+                    <button
+                      key={a.student.id}
+                      type="button"
+                      onClick={() => openHistory(a.student)}
+                      className="inline-flex items-center gap-2 text-xs rounded-full border border-destructive/30 bg-background px-3 py-1 hover:bg-destructive/10 transition-colors"
+                    >
+                      <span className="font-medium">{a.student.name}</span>
+                      <span className="text-destructive tabular-nums">
+                        {APP_CONFIG.currency} {a.amount.toFixed(2)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {priorCredits.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-success uppercase tracking-wide">
+                    多缴余额 / Baki Lebihan
+                  </span>
+                  <span className="text-xs tabular-nums text-success">
+                    合计 {APP_CONFIG.currency}{" "}
+                    {priorCredits.reduce((s, a) => s + a.amount, 0).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {priorCredits.map((a) => (
+                    <button
+                      key={a.student.id}
+                      type="button"
+                      onClick={() => openHistory(a.student)}
+                      className="inline-flex items-center gap-2 text-xs rounded-full border border-success/30 bg-background px-3 py-1 hover:bg-success/10 transition-colors"
+                    >
+                      <span className="font-medium">{a.student.name}</span>
+                      <span className="text-success tabular-nums">
+                        {APP_CONFIG.currency} {a.amount.toFixed(2)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -1186,7 +1333,9 @@ export function StudentFees() {
                 <TableHead className="text-center">收费课次</TableHead>
                 <TableHead className="text-right">应缴</TableHead>
                 <TableHead className="text-right">已缴</TableHead>
-                <TableHead className="text-right">余额</TableHead>
+                <TableHead className="text-right" title="截至本月末的累计余额（历史结转已包含）">
+                  累计余额
+                </TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -1658,6 +1807,102 @@ export function StudentFees() {
               />
             </div>
 
+            {/* Quick-fill panel */}
+            <div className="border rounded-md p-3 bg-accent/10 space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground">
+                快速填充 / Auto Isi
+              </Label>
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    按欠费分配（总金额）
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={quickArrearsTotal}
+                    onChange={(e) => setQuickArrearsTotal(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={applyArrearsFill}
+                  disabled={loadingOwing}
+                >
+                  填充
+                </Button>
+              </div>
+              <div className="flex items-end gap-1.5">
+                <div className="w-[70px]">
+                  <Label className="text-[10px] text-muted-foreground">起月</Label>
+                  <Select
+                    value={String(quickEvenStart)}
+                    onValueChange={(v) => setQuickEvenStart(Number(v))}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((m, i) => (
+                        <SelectItem key={i} value={String(i + 1)}>
+                          {i + 1}月
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-[70px]">
+                  <Label className="text-[10px] text-muted-foreground">至月</Label>
+                  <Select
+                    value={String(quickEvenEnd)}
+                    onValueChange={(v) => setQuickEvenEnd(Number(v))}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((m, i) => (
+                        <SelectItem key={i} value={String(i + 1)}>
+                          {i + 1}月
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1">
+                  <Label className="text-[10px] text-muted-foreground">每月</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={quickEvenAmount}
+                    onChange={(e) => setQuickEvenAmount(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={applyEvenFill}
+                >
+                  平均
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                按欠费：从最早欠费月份开始，剩余自动放入{selectedMonth + 1}月作预付。
+                平均：按月份范围 × 单月金额生成。
+              </p>
+            </div>
+
             {/* Allocation rows */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -1934,7 +2179,12 @@ function FeeGroupRows({
                 onClick={() =>
                   onOpenPayment(
                     row.student,
-                    row.balance < 0 ? Math.abs(row.balance) : 0
+                    // Prefill with cumulative owing if any, else this month's due.
+                    row.balance < 0
+                      ? Math.abs(row.balance)
+                      : row.monthBalance < 0
+                        ? Math.abs(row.monthBalance)
+                        : 0
                   )
                 }
               >
