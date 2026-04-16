@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
-import { printReceiptHtml } from "@/lib/receipt-html";
+import { printReceiptHtml, type ReceiptAllocation } from "@/lib/receipt-html";
 import { toast } from "sonner";
 
 interface Props {
@@ -14,6 +14,7 @@ interface Props {
   amount: number;
   month: number;
   year: number;
+  allocations?: ReceiptAllocation[];
   notes: string | null;
   coachName?: string | null;
 }
@@ -27,6 +28,7 @@ export function ParentReceiptButton({
   amount,
   month,
   year,
+  allocations,
   notes,
   coachName,
 }: Props) {
@@ -40,6 +42,7 @@ export function ParentReceiptButton({
       amount,
       month,
       year,
+      allocations,
       notes,
       coachName,
     });

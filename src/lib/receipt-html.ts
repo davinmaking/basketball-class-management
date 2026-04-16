@@ -1,6 +1,12 @@
 import { format, parseISO } from "date-fns";
 import { APP_CONFIG } from "./config";
 
+export interface ReceiptAllocation {
+  month: number;
+  year: number;
+  amount: number;
+}
+
 interface ReceiptData {
   receiptNumber: string;
   issuedAt: string | null;
@@ -10,6 +16,9 @@ interface ReceiptData {
   amount: number;
   month: number;
   year: number;
+  // When provided and length >= 2, the receipt renders a per-month breakdown.
+  // Length 1 or absent falls back to the simple single-month format.
+  allocations?: ReceiptAllocation[];
   notes: string | null;
   coachName?: string | null;
 }
@@ -22,6 +31,9 @@ export function generateReceiptHtml(data: ReceiptData): string {
   const dateStr = dateSource
     ? format(parseISO(dateSource), "dd/MM/yyyy")
     : "-";
+
+  const allocs = data.allocations ?? [];
+  const isMulti = allocs.length >= 2;
 
   const schoolClassRow = data.schoolClass
     ? `<tr>
@@ -36,6 +48,33 @@ export function generateReceiptHtml(data: ReceiptData): string {
         <td class="value">${data.notes}</td>
       </tr>`
     : "";
+
+  const breakdownBlock = isMulti
+    ? `<div class="breakdown">
+        <div class="breakdown-title">Pecahan / 明细:</div>
+        ${allocs
+          .slice()
+          .sort((a, b) =>
+            a.year === b.year ? a.month - b.month : a.year - b.year
+          )
+          .map(
+            (a) => `
+        <div class="breakdown-row">
+          <span>Yuran ${APP_CONFIG.classNameBm} ${a.month}/${a.year}</span>
+          <span>${APP_CONFIG.currency} ${a.amount.toFixed(2)}</span>
+        </div>`
+          )
+          .join("")}
+        <div class="breakdown-row total">
+          <span>Jumlah / 合计:</span>
+          <span>${APP_CONFIG.currency} ${data.amount.toFixed(2)}</span>
+        </div>
+      </div>`
+    : "";
+
+  const keteranganValue = isMulti
+    ? `Yuran ${APP_CONFIG.classNameBm} (${allocs.length} bulan)`
+    : `Yuran ${APP_CONFIG.classNameBm} - ${data.month}/${data.year}`;
 
   return `<!DOCTYPE html>
 <html>
@@ -84,6 +123,30 @@ export function generateReceiptHtml(data: ReceiptData): string {
       justify-content: space-between;
       align-items: center;
       font-size: 16px;
+      font-weight: bold;
+    }
+    .breakdown {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin: 12px 0;
+      background: #f8f9fa;
+      font-size: 12px;
+    }
+    .breakdown-title {
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #555;
+    }
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+    .breakdown-row.total {
+      border-top: 1px solid #ccc;
+      margin-top: 4px;
+      padding-top: 6px;
       font-weight: bold;
     }
     .signature-section {
@@ -146,10 +209,12 @@ export function generateReceiptHtml(data: ReceiptData): string {
     ${schoolClassRow}
     <tr>
       <td class="label">Keterangan / 项目:</td>
-      <td class="value">Yuran ${APP_CONFIG.classNameBm} - ${data.month}/${data.year}</td>
+      <td class="value">${keteranganValue}</td>
     </tr>
     ${notesRow}
   </table>
+
+  ${breakdownBlock}
 
   <div class="amount-box">
     <span>Jumlah / 金额:</span>

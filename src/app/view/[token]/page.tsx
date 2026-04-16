@@ -85,18 +85,46 @@ export default async function ParentViewPage({
     .eq("year", displayYear)
     .order("payment_date", { ascending: false });
 
-  // Get receipts
-  const paymentIds = (payments ?? []).map((p) => p.id);
-  const { data: receipts } = paymentIds.length > 0
-    ? await supabase
-        .from("receipts")
-        .select("*")
-        .in("payment_id", paymentIds)
+  // Get receipts: index by receipt_id so multi-month receipts are correctly resolved
+  // for every one of their payment rows.
+  const paymentsByReceipt = new Map<string, typeof payments>();
+  (payments ?? []).forEach((p) => {
+    if (p.receipt_id) {
+      const arr = paymentsByReceipt.get(p.receipt_id) ?? [];
+      arr!.push(p);
+      paymentsByReceipt.set(p.receipt_id, arr!);
+    }
+  });
+
+  const receiptIds = Array.from(paymentsByReceipt.keys());
+  const { data: receipts } = receiptIds.length > 0
+    ? await supabase.from("receipts").select("*").in("id", receiptIds)
     : { data: [] };
 
-  const receiptMap = new Map(
-    (receipts ?? []).map((r) => [r.payment_id, r])
-  );
+  // receipt_id → { receipt, totalAmount, allocations } so the printed receipt
+  // reflects the full transaction (RM240 across March+April), not a single row.
+  const receiptInfo = new Map<
+    string,
+    {
+      receipt: NonNullable<typeof receipts>[number];
+      totalAmount: number;
+      allocations: { month: number; year: number; amount: number }[];
+    }
+  >();
+  (receipts ?? []).forEach((r) => {
+    const pays = paymentsByReceipt.get(r.id) ?? [];
+    const totalAmount = pays!.reduce((s, p) => s + Number(p.amount), 0);
+    const allocations = pays!
+      .map((p) => ({
+        month: p.month,
+        year: p.year,
+        amount: Number(p.amount),
+      }))
+      .sort((a, b) =>
+        a.year === b.year ? a.month - b.month : a.year - b.year
+      );
+    receiptInfo.set(r.id, { receipt: r, totalAmount, allocations });
+  });
 
   // Get refunds with credit notes
   const { data: refunds } = await supabase
@@ -337,7 +365,10 @@ export default async function ParentViewPage({
                 </TableHeader>
                 <TableBody>
                   {(payments ?? []).map((payment) => {
-                    const receipt = receiptMap.get(payment.id);
+                    const info = payment.receipt_id
+                      ? receiptInfo.get(payment.receipt_id)
+                      : null;
+                    const receipt = info?.receipt;
                     const isVoided = payment.voided;
                     return (
                       <TableRow key={payment.id} className={isVoided ? "text-muted-foreground" : ""}>
@@ -357,16 +388,17 @@ export default async function ParentViewPage({
                           {payment.coach?.name ?? "-"}
                         </TableCell>
                         <TableCell className="text-right">
-                          {receipt && !isVoided && (
+                          {receipt && info && !isVoided && (
                             <ParentReceiptButton
                               receiptNumber={receipt.receipt_number}
                               issuedAt={receipt.issued_at ?? ""}
                               date={payment.payment_date}
                               studentName={student.name}
                               schoolClass={student.school_class}
-                              amount={Number(payment.amount)}
+                              amount={info.totalAmount}
                               month={payment.month}
                               year={payment.year}
+                              allocations={info.allocations}
                               notes={payment.notes}
                               coachName={payment.coach?.name}
                             />

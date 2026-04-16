@@ -40,7 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { DollarSign, MessageCircle, History, Trash2, Undo2 } from "lucide-react";
+import { DollarSign, MessageCircle, History, Trash2, Undo2, Plus, X, AlertTriangle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import { formatPhoneForWhatsApp } from "@/lib/phone";
@@ -57,12 +57,19 @@ interface HistoryPayment {
   payment_date: string;
   month: number;
   year: number;
+  receipt_id: string | null;
   notes: string | null;
   voided: boolean;
   voided_at: string | null;
   voided_reason: string | null;
-  receipts: { receipt_number: string; voided: boolean }[];
+  receipt: { id: string; receipt_number: string; voided: boolean } | null;
   coach: { name: string } | null;
+}
+
+interface Allocation {
+  month: number;
+  year: number;
+  amount: string;
 }
 
 interface HistoryRefund {
@@ -93,6 +100,11 @@ interface FeeRow {
   amountDue: number;
   totalPaid: number;
   balance: number;
+}
+
+interface ArrearsEntry {
+  student: Student;
+  amount: number; // positive number representing outstanding from prior months
 }
 
 function getWhatsAppUrl(
@@ -128,18 +140,22 @@ function getWhatsAppUrl(
 
 export function StudentFees() {
   const [feeData, setFeeData] = useState<FeeRow[]>([]);
+  const [arrears, setArrears] = useState<ArrearsEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [showPayment, setShowPayment] = useState(false);
   const [paymentStudent, setPaymentStudent] = useState<Student | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState("");
+  const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [paymentNotes, setPaymentNotes] = useState("");
   const [paymentDate, setPaymentDate] = useState(
     new Date().toISOString().split("T")[0]
   );
   const [savingPayment, setSavingPayment] = useState(false);
   const [paymentCoachId, setPaymentCoachId] = useState("");
+  // Owing per (year-month) for the student being paid, used to show "欠 RM X" hints
+  const [studentOwingByKey, setStudentOwingByKey] = useState<Record<string, number>>({});
+  const [loadingOwing, setLoadingOwing] = useState(false);
 
   // Coaches
   const [coaches, setCoaches] = useState<Coach[]>([]);
@@ -250,6 +266,68 @@ export function StudentFees() {
     });
 
     setFeeData(rows);
+
+    // Compute historical arrears (net unpaid balance from BEFORE the selected month)
+    const priorSessionsRes = await supabase
+      .from("class_sessions")
+      .select("id")
+      .lt("session_date", startDate);
+    const priorSessionIds = (priorSessionsRes.data ?? []).map((s) => s.id);
+
+    const dueByStudent: Record<string, number> = {};
+    if (priorSessionIds.length > 0) {
+      const { data: priorAtt } = await supabase
+        .from("attendance")
+        .select("student_id")
+        .eq("present", true)
+        .eq("fee_exempt", false)
+        .in("session_id", priorSessionIds);
+      (priorAtt ?? []).forEach((a) => {
+        dueByStudent[a.student_id] =
+          (dueByStudent[a.student_id] ?? 0) + APP_CONFIG.feePerSession;
+      });
+    }
+
+    // Prior payments: (year < selectedYear) OR (year = selectedYear AND month < month)
+    const { data: priorPayData } = await supabase
+      .from("payments")
+      .select("student_id, amount, year, month")
+      .eq("voided", false)
+      .or(
+        `year.lt.${selectedYear},and(year.eq.${selectedYear},month.lt.${month})`
+      );
+
+    const paidByStudent: Record<string, number> = {};
+    (priorPayData ?? []).forEach((p) => {
+      paidByStudent[p.student_id] =
+        (paidByStudent[p.student_id] ?? 0) + Number(p.amount);
+    });
+
+    const studentById = new Map<string, Student>(students.map((s) => [s.id, s]));
+    const arrearsList: ArrearsEntry[] = [];
+    const seen = new Set<string>([
+      ...Object.keys(dueByStudent),
+      ...Object.keys(paidByStudent),
+    ]);
+    seen.forEach((sid) => {
+      const st = studentById.get(sid);
+      if (!st || st.active === false) return;
+      const due = dueByStudent[sid] ?? 0;
+      const paid = paidByStudent[sid] ?? 0;
+      const balance = paid - due; // negative = owes
+      if (balance < -0.009) {
+        arrearsList.push({ student: st, amount: Math.abs(balance) });
+      }
+    });
+    arrearsList.sort((a, b) => {
+      const classA = a.student.school_class || "\uffff";
+      const classB = b.student.school_class || "\uffff";
+      const c = classA.localeCompare(classB, "zh");
+      if (c !== 0) return c;
+      return a.student.name.localeCompare(b.student.name, "zh");
+    });
+    setArrears(arrearsList);
+
     setLoading(false);
   }, [supabase, selectedMonth, selectedYear]);
 
@@ -267,56 +345,190 @@ export function StudentFees() {
     fetchCoaches();
   }, [fetchFees, fetchCoaches]);
 
-  function openPaymentDialog(student: Student, suggestedAmount: number) {
+  async function openPaymentDialog(student: Student, suggestedAmount: number) {
     setPaymentStudent(student);
-    setPaymentAmount(suggestedAmount > 0 ? String(suggestedAmount) : "");
     setPaymentNotes("");
     setPaymentDate(new Date().toISOString().split("T")[0]);
     setPaymentCoachId("");
+    setAllocations([
+      {
+        month: selectedMonth + 1,
+        year: selectedYear,
+        amount: suggestedAmount > 0 ? suggestedAmount.toFixed(2) : "",
+      },
+    ]);
     setShowPayment(true);
+    setStudentOwingByKey({});
+    setLoadingOwing(true);
+
+    // Fetch owing per month for this student (current year) so allocation rows can
+    // show "欠 RM X" hints next to the month picker.
+    const owing = await computeStudentOwing(student.id, selectedYear);
+    setStudentOwingByKey(owing);
+    setLoadingOwing(false);
+  }
+
+  async function computeStudentOwing(
+    studentId: string,
+    year: number
+  ): Promise<Record<string, number>> {
+    const [sessionsRes, paymentsRes] = await Promise.all([
+      supabase
+        .from("class_sessions")
+        .select("id, session_date")
+        .gte("session_date", `${year}-01-01`)
+        .lt("session_date", `${year + 1}-01-01`),
+      supabase
+        .from("payments")
+        .select("month, amount")
+        .eq("student_id", studentId)
+        .eq("year", year)
+        .eq("voided", false),
+    ]);
+
+    const sessionMonth = new Map<string, number>();
+    (sessionsRes.data ?? []).forEach((s) => {
+      sessionMonth.set(s.id, new Date(s.session_date).getMonth() + 1);
+    });
+
+    const sessionIds = Array.from(sessionMonth.keys());
+    let attendanceRows: { session_id: string }[] = [];
+    if (sessionIds.length > 0) {
+      const { data } = await supabase
+        .from("attendance")
+        .select("session_id")
+        .eq("student_id", studentId)
+        .eq("present", true)
+        .eq("fee_exempt", false)
+        .in("session_id", sessionIds);
+      attendanceRows = data ?? [];
+    }
+
+    const dueByMonth: Record<number, number> = {};
+    attendanceRows.forEach((a) => {
+      const m = sessionMonth.get(a.session_id);
+      if (m) dueByMonth[m] = (dueByMonth[m] ?? 0) + APP_CONFIG.feePerSession;
+    });
+
+    const paidByMonth: Record<number, number> = {};
+    (paymentsRes.data ?? []).forEach((p) => {
+      paidByMonth[p.month] = (paidByMonth[p.month] ?? 0) + Number(p.amount);
+    });
+
+    const result: Record<string, number> = {};
+    for (let m = 1; m <= 12; m++) {
+      const due = dueByMonth[m] ?? 0;
+      const paid = paidByMonth[m] ?? 0;
+      // balance: negative = owes, positive = overpaid, 0 = settled
+      result[`${year}-${m}`] = paid - due;
+    }
+    return result;
+  }
+
+  function addAllocationRow() {
+    // Default new row to the earliest still-owed month not already in allocations
+    const used = new Set(allocations.map((a) => `${a.year}-${a.month}`));
+    let defaultMonth = selectedMonth + 1;
+    let defaultYear = selectedYear;
+    for (let m = 1; m <= 12; m++) {
+      const key = `${selectedYear}-${m}`;
+      if (!used.has(key) && (studentOwingByKey[key] ?? 0) < 0) {
+        defaultMonth = m;
+        defaultYear = selectedYear;
+        break;
+      }
+    }
+    setAllocations((prev) => [
+      ...prev,
+      { month: defaultMonth, year: defaultYear, amount: "" },
+    ]);
+  }
+
+  function updateAllocation(idx: number, patch: Partial<Allocation>) {
+    setAllocations((prev) =>
+      prev.map((a, i) => (i === idx ? { ...a, ...patch } : a))
+    );
+  }
+
+  function removeAllocation(idx: number) {
+    setAllocations((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  const allocationsTotal = allocations.reduce((s, a) => {
+    const n = parseFloat(a.amount);
+    return s + (isNaN(n) ? 0 : n);
+  }, 0);
+
+  const allocationsValid =
+    allocations.length > 0 &&
+    allocations.every((a) => {
+      const n = parseFloat(a.amount);
+      return !isNaN(n) && n > 0 && a.month >= 1 && a.month <= 12 && a.year > 0;
+    }) &&
+    // no duplicate (year, month) combos
+    new Set(allocations.map((a) => `${a.year}-${a.month}`)).size ===
+      allocations.length;
+
+  function getOwingHint(month: number, year: number): string | null {
+    if (year !== selectedYear) return null; // owing only prefetched for selectedYear
+    const bal = studentOwingByKey[`${year}-${month}`];
+    if (bal === undefined) return null;
+    if (bal < 0) return `欠 ${APP_CONFIG.currency}${Math.abs(bal).toFixed(2)}`;
+    if (bal > 0) return `多缴 ${APP_CONFIG.currency}${bal.toFixed(2)}`;
+    return "已结清";
   }
 
   async function handleRecordPayment() {
-    if (!paymentStudent || !paymentAmount) return;
-    const amount = parseFloat(paymentAmount);
-    if (isNaN(amount) || amount <= 0) {
-      toast.error("请输入有效金额");
-      return;
-    }
+    if (!paymentStudent || !allocationsValid) return;
 
     setSavingPayment(true);
-    const month = selectedMonth + 1;
 
-    // Insert payment
-    const { data: paymentData, error: paymentError } = await supabase
+    const baseRow = {
+      student_id: paymentStudent.id,
+      payment_date: paymentDate,
+      notes: paymentNotes.trim() || null,
+      coach_id: paymentCoachId && paymentCoachId !== "none" ? paymentCoachId : null,
+    };
+
+    // Step 1: Insert the first payment row (no receipt_id yet)
+    const first = allocations[0];
+    const firstAmount = parseFloat(first.amount);
+    const { data: firstPayment, error: firstErr } = await supabase
       .from("payments")
       .insert({
-        student_id: paymentStudent.id,
-        amount,
-        payment_date: paymentDate,
-        month,
-        year: selectedYear,
-        notes: paymentNotes.trim() || null,
-        coach_id: paymentCoachId && paymentCoachId !== "none" ? paymentCoachId : null,
+        ...baseRow,
+        amount: firstAmount,
+        month: first.month,
+        year: first.year,
       })
       .select()
       .single();
 
-    if (paymentError) {
+    if (firstErr || !firstPayment) {
       toast.error("记录付款失败");
       setSavingPayment(false);
       return;
     }
 
-    // Auto-generate receipt with retry on conflict
+    // Step 2: Generate receipt_number scoped to payment_date's month, with retry on race
+    const payDate = parseISO(paymentDate);
+    const receiptYear = payDate.getFullYear();
+    const receiptMonth = payDate.getMonth() + 1;
+    const monthStr = String(receiptMonth).padStart(2, "0");
+
+    let receiptId = "";
     let receiptNumber = "";
+    let receiptOk = false;
     const maxRetries = 3;
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const monthStr = String(month).padStart(2, "0");
       const { data: lastReceipt } = await supabase
         .from("receipts")
         .select("receipt_number")
-        .like("receipt_number", `${APP_CONFIG.receiptPrefix}-${selectedYear}-${monthStr}-%`)
+        .like(
+          "receipt_number",
+          `${APP_CONFIG.receiptPrefix}-${receiptYear}-${monthStr}-%`
+        )
         .order("receipt_number", { ascending: false })
         .limit(1)
         .single();
@@ -327,30 +539,65 @@ export function StudentFees() {
         nextNum = parseInt(parts[parts.length - 1]) + 1;
       }
 
-      receiptNumber = `${APP_CONFIG.receiptPrefix}-${selectedYear}-${monthStr}-${String(nextNum).padStart(3, "0")}`;
+      receiptNumber = `${APP_CONFIG.receiptPrefix}-${receiptYear}-${monthStr}-${String(nextNum).padStart(3, "0")}`;
 
-      const { error: receiptError } = await supabase.from("receipts").insert({
-        payment_id: paymentData.id,
-        receipt_number: receiptNumber,
-      });
+      const { data: receiptData, error: receiptError } = await supabase
+        .from("receipts")
+        .insert({
+          payment_id: firstPayment.id,
+          receipt_number: receiptNumber,
+        })
+        .select()
+        .single();
 
-      if (!receiptError) break;
-
-      // Retry on unique constraint violation (race condition)
-      if (receiptError.code === "23505" && attempt < maxRetries - 1) {
-        continue;
+      if (!receiptError && receiptData) {
+        receiptOk = true;
+        receiptId = receiptData.id;
+        break;
       }
 
-      // Final attempt failed or non-constraint error
-      toast.error("生成收据失败，但付款已记录");
+      if (receiptError?.code === "23505" && attempt < maxRetries - 1) {
+        continue;
+      }
+      break;
+    }
+
+    if (!receiptOk) {
+      // Rollback first payment
+      await supabase.from("payments").delete().eq("id", firstPayment.id);
+      toast.error("生成收据失败，付款已取消");
       setSavingPayment(false);
-      setShowPayment(false);
-      fetchFees();
       return;
     }
 
+    // Step 3: Link first payment to receipt
+    await supabase
+      .from("payments")
+      .update({ receipt_id: receiptId })
+      .eq("id", firstPayment.id);
+
+    // Step 4: Insert remaining allocations sharing the same receipt
+    if (allocations.length > 1) {
+      const remaining = allocations.slice(1).map((a) => ({
+        ...baseRow,
+        amount: parseFloat(a.amount),
+        month: a.month,
+        year: a.year,
+        receipt_id: receiptId,
+      }));
+      const { error: restErr } = await supabase.from("payments").insert(remaining);
+      if (restErr) {
+        // Rollback: delete receipt (SET NULL cascades receipt_id on remaining), then delete all siblings + first
+        await supabase.from("receipts").delete().eq("id", receiptId);
+        await supabase.from("payments").delete().eq("id", firstPayment.id);
+        toast.error("分配记录失败，付款已取消");
+        setSavingPayment(false);
+        return;
+      }
+    }
+
     toast.success(
-      `已记录付款 ${APP_CONFIG.currency}${amount.toFixed(2)}。收据: ${receiptNumber}`
+      `已记录付款 ${APP_CONFIG.currency}${allocationsTotal.toFixed(2)}。收据: ${receiptNumber}`
     );
     setSavingPayment(false);
     setShowPayment(false);
@@ -567,7 +814,9 @@ export function StudentFees() {
     const [paymentsData, refundsData] = await Promise.all([
       supabase
         .from("payments")
-        .select("*, receipts(receipt_number, voided), coach:coaches(name)")
+        .select(
+          "*, receipt:receipts!payments_receipt_id_fkey(id, receipt_number, voided), coach:coaches(name)"
+        )
         .eq("student_id", student.id)
         .eq("month", month)
         .eq("year", selectedYear)
@@ -599,33 +848,58 @@ export function StudentFees() {
     if (!voidPaymentId) return;
     setVoidingPayment(true);
 
-    // Void the payment
-    const { error: payError } = await supabase
+    // Look up the payment's receipt to decide scope: void at receipt level
+    // (so all sibling payment rows sharing the same receipt are voided together).
+    const { data: pay } = await supabase
       .from("payments")
-      .update({
-        voided: true,
-        voided_at: new Date().toISOString(),
-        voided_reason: voidReason.trim() || null,
-      })
-      .eq("id", voidPaymentId);
+      .select("receipt_id")
+      .eq("id", voidPaymentId)
+      .single();
 
-    if (payError) {
-      toast.error("撤回付款失败");
-      setVoidingPayment(false);
-      return;
+    const voidPayload = {
+      voided: true,
+      voided_at: new Date().toISOString(),
+      voided_reason: voidReason.trim() || null,
+    };
+
+    if (pay?.receipt_id) {
+      // New model: void all payments sharing this receipt + the receipt itself
+      const [{ error: payErr }, { error: recErr }] = await Promise.all([
+        supabase
+          .from("payments")
+          .update(voidPayload)
+          .eq("receipt_id", pay.receipt_id),
+        supabase
+          .from("receipts")
+          .update({ voided: true })
+          .eq("id", pay.receipt_id),
+      ]);
+      if (payErr || recErr) {
+        toast.error("撤回付款失败");
+        setVoidingPayment(false);
+        return;
+      }
+    } else {
+      // Legacy fallback (payment without receipt_id)
+      const { error: payError } = await supabase
+        .from("payments")
+        .update(voidPayload)
+        .eq("id", voidPaymentId);
+      if (payError) {
+        toast.error("撤回付款失败");
+        setVoidingPayment(false);
+        return;
+      }
+      await supabase
+        .from("receipts")
+        .update({ voided: true })
+        .eq("payment_id", voidPaymentId);
     }
-
-    // Void linked receipt
-    await supabase
-      .from("receipts")
-      .update({ voided: true })
-      .eq("payment_id", voidPaymentId);
 
     toast.success("付款已撤回");
     setVoidingPayment(false);
     setShowVoid(false);
 
-    // Refresh history if open
     if (historyStudent) {
       openHistory(historyStudent);
     }
@@ -636,25 +910,70 @@ export function StudentFees() {
     setDeletingPaymentId(paymentId);
     setConfirmDeletePaymentId(null);
 
-    // Delete receipt first (child), then payment (parent)
-    const { error: receiptErr } = await supabase.from("receipts").delete().eq("payment_id", paymentId);
-    if (receiptErr) {
-      toast.error("删除收据失败");
-      setDeletingPaymentId(null);
-      return;
-    }
+    // Look up the payment's receipt to decide scope
+    const { data: pay } = await supabase
+      .from("payments")
+      .select("receipt_id")
+      .eq("id", paymentId)
+      .single();
 
-    const { error } = await supabase.from("payments").delete().eq("id", paymentId);
-    if (error) {
-      toast.error("删除付款记录失败（收据已删除，请联系管理员）");
-      setDeletingPaymentId(null);
-      return;
+    if (pay?.receipt_id) {
+      // Collect sibling payment ids BEFORE deleting the receipt (receipts.id FK
+      // sets payments.receipt_id to NULL on delete, so we'd lose the link).
+      const { data: siblings } = await supabase
+        .from("payments")
+        .select("id")
+        .eq("receipt_id", pay.receipt_id);
+      const siblingIds = (siblings ?? []).map((s) => s.id);
+
+      // Delete receipt first (FK from receipts.payment_id forces this order)
+      const { error: recErr } = await supabase
+        .from("receipts")
+        .delete()
+        .eq("id", pay.receipt_id);
+      if (recErr) {
+        toast.error("删除收据失败");
+        setDeletingPaymentId(null);
+        return;
+      }
+
+      if (siblingIds.length > 0) {
+        const { error: payErr } = await supabase
+          .from("payments")
+          .delete()
+          .in("id", siblingIds);
+        if (payErr) {
+          toast.error("删除付款记录失败（收据已删除，请联系管理员）");
+          setDeletingPaymentId(null);
+          return;
+        }
+      }
+    } else {
+      // Legacy fallback
+      const { error: receiptErr } = await supabase
+        .from("receipts")
+        .delete()
+        .eq("payment_id", paymentId);
+      if (receiptErr) {
+        toast.error("删除收据失败");
+        setDeletingPaymentId(null);
+        return;
+      }
+
+      const { error } = await supabase
+        .from("payments")
+        .delete()
+        .eq("id", paymentId);
+      if (error) {
+        toast.error("删除付款记录失败（收据已删除，请联系管理员）");
+        setDeletingPaymentId(null);
+        return;
+      }
     }
 
     toast.success("已删除撤回的付款记录");
     setDeletingPaymentId(null);
 
-    // Refresh history if open
     if (historyStudent) {
       openHistory(historyStudent);
     }
@@ -818,6 +1137,46 @@ export function StudentFees() {
         </Card>
       </div>
 
+      {arrears.length > 0 && (
+        <Card className="mb-4 border-destructive/30 bg-destructive/5">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                历史欠费结转 / Tunggakan Dari Bulan Lepas
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                截至 {selectedYear}年{selectedMonth + 1}月 前尚未结清
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-muted-foreground">合计</div>
+              <div className="font-bold tabular-nums text-destructive">
+                {APP_CONFIG.currency}{" "}
+                {arrears.reduce((s, a) => s + a.amount, 0).toFixed(2)}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-2">
+              {arrears.map((a) => (
+                <button
+                  key={a.student.id}
+                  type="button"
+                  onClick={() => openHistory(a.student)}
+                  className="inline-flex items-center gap-2 text-xs rounded-full border border-destructive/30 bg-background px-3 py-1 hover:bg-destructive/10 transition-colors"
+                >
+                  <span className="font-medium">{a.student.name}</span>
+                  <span className="text-destructive tabular-nums">
+                    {APP_CONFIG.currency} {a.amount.toFixed(2)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="p-0 overflow-x-auto">
           <Table>
@@ -890,7 +1249,7 @@ export function StudentFees() {
                     付款
                   </p>
                   {historyPayments.map((payment) => {
-                    const receipt = payment.receipts?.[0];
+                    const receipt = payment.receipt;
                     return (
                       <div
                         key={payment.id}
@@ -1282,26 +1641,13 @@ export function StudentFees() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Payment dialog */}
+      {/* Payment dialog — supports multi-month allocation (one receipt, N rows) */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              记录付款 — {paymentStudent?.name}
-            </DialogTitle>
+            <DialogTitle>记录付款 — {paymentStudent?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="pay-amount">金额 ({APP_CONFIG.currency})</Label>
-              <Input
-                id="pay-amount"
-                type="number"
-                step="0.01"
-                min="0"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="pay-date">付款日期</Label>
               <Input
@@ -1311,11 +1657,131 @@ export function StudentFees() {
                 onChange={(e) => setPaymentDate(e.target.value)}
               />
             </div>
+
+            {/* Allocation rows */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>分配到月份</Label>
+                {loadingOwing && (
+                  <span className="text-xs text-muted-foreground">计算欠费中...</span>
+                )}
+              </div>
+              <div className="space-y-2">
+                {allocations.map((alloc, idx) => {
+                  const hint = getOwingHint(alloc.month, alloc.year);
+                  const dupKey = `${alloc.year}-${alloc.month}`;
+                  const isDup =
+                    allocations.filter((a) => `${a.year}-${a.month}` === dupKey)
+                      .length > 1;
+                  return (
+                    <div
+                      key={idx}
+                      className="border rounded-md p-2 space-y-1.5 bg-muted/30"
+                    >
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground">月份</Label>
+                          <Select
+                            value={String(alloc.month)}
+                            onValueChange={(v) =>
+                              updateAllocation(idx, { month: Number(v) })
+                            }
+                          >
+                            <SelectTrigger className="h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MONTHS.map((m, i) => (
+                                <SelectItem key={i} value={String(i + 1)}>
+                                  {m}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-[80px]">
+                          <Label className="text-xs text-muted-foreground">年份</Label>
+                          <Input
+                            type="number"
+                            min={2024}
+                            max={2030}
+                            value={alloc.year}
+                            onChange={(e) => {
+                              const v = Number(e.target.value);
+                              if (!isNaN(v))
+                                updateAllocation(idx, { year: v });
+                            }}
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground">
+                            金额
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={alloc.amount}
+                            onChange={(e) =>
+                              updateAllocation(idx, { amount: e.target.value })
+                            }
+                            className="h-9"
+                          />
+                        </div>
+                        {allocations.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeAllocation(idx)}
+                            aria-label="删除此行"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {hint ?? ""}
+                        </span>
+                        {isDup && (
+                          <span className="text-destructive flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            月份重复
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addAllocationRow}
+                className="w-full"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                另一个月
+              </Button>
+            </div>
+
+            <div className="flex justify-between items-center border-t pt-3 font-medium">
+              <span>合计</span>
+              <span className="tabular-nums">
+                {APP_CONFIG.currency} {allocationsTotal.toFixed(2)}
+              </span>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="pay-notes">备注</Label>
               <Textarea
                 id="pay-notes"
-                placeholder="例如: 现金支付, 预付2个月等"
+                placeholder="例如: 现金支付, 预付等"
                 value={paymentNotes}
                 onChange={(e) => setPaymentNotes(e.target.value)}
               />
@@ -1342,7 +1808,10 @@ export function StudentFees() {
               <Button variant="outline" onClick={() => setShowPayment(false)}>
                 取消
               </Button>
-              <Button onClick={handleRecordPayment} disabled={savingPayment}>
+              <Button
+                onClick={handleRecordPayment}
+                disabled={savingPayment || !allocationsValid}
+              >
                 {savingPayment ? "保存中..." : "记录付款"}
               </Button>
             </div>

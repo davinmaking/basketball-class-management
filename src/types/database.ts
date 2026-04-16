@@ -226,6 +226,7 @@ export type Database = {
           month: number
           notes: string | null
           payment_date: string
+          receipt_id: string | null
           student_id: string
           voided: boolean
           voided_at: string | null
@@ -240,6 +241,7 @@ export type Database = {
           month: number
           notes?: string | null
           payment_date?: string
+          receipt_id?: string | null
           student_id: string
           voided?: boolean
           voided_at?: string | null
@@ -254,6 +256,7 @@ export type Database = {
           month?: number
           notes?: string | null
           payment_date?: string
+          receipt_id?: string | null
           student_id?: string
           voided?: boolean
           voided_at?: string | null
@@ -266,6 +269,13 @@ export type Database = {
             columns: ["coach_id"]
             isOneToOne: false
             referencedRelation: "coaches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
             referencedColumns: ["id"]
           },
           {

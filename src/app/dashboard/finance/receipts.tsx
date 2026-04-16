@@ -36,20 +36,24 @@ import { toast } from "sonner";
 import { printReceiptHtml, printCreditNoteHtml } from "@/lib/receipt-html";
 import { APP_CONFIG } from "@/lib/config";
 
-interface ReceiptRow {
-  id: string;
-  payment_id: string;
-  receipt_number: string;
-  issued_at: string | null;
-  amount: number;
-  payment_date: string;
+interface ReceiptAllocation {
   month: number;
   year: number;
+  amount: number;
+}
+
+interface ReceiptRow {
+  id: string;
+  receipt_number: string;
+  issued_at: string | null;
+  total_amount: number;
+  payment_date: string; // earliest among the receipt's payment rows
+  allocations: ReceiptAllocation[]; // sorted by year then month
   student_name: string;
   school_class: string | null;
   notes: string | null;
   voided: boolean;
-  payment_voided: boolean;
+  payment_voided: boolean; // true if ALL payment rows are voided (legacy safeguard)
   coach_name: string | null;
 }
 
@@ -87,16 +91,16 @@ export function Receipts() {
   const supabase = createClient();
 
   const fetchReceipts = useCallback(async () => {
+    // Query via the new receipt_id FK so a single receipt can own N payment rows.
     const { data, error } = await supabase
       .from("receipts")
       .select(
         `
         id,
-        payment_id,
         receipt_number,
         issued_at,
         voided,
-        payment:payments!inner(
+        payments:payments!payments_receipt_id_fkey(
           id,
           amount,
           payment_date,
@@ -117,26 +121,75 @@ export function Receipts() {
       return;
     }
 
-    const rows: ReceiptRow[] = (data ?? []).map((r: any) => ({
-      id: r.id,
-      payment_id: r.payment_id,
-      receipt_number: r.receipt_number,
-      issued_at: r.issued_at,
-      amount: r.payment.amount,
-      payment_date: r.payment.payment_date,
-      month: r.payment.month,
-      year: r.payment.year,
-      student_name: r.payment.student.name,
-      school_class: r.payment.student.school_class ?? null,
-      notes: r.payment.notes,
-      voided: r.voided ?? false,
-      payment_voided: r.payment.voided ?? false,
-      coach_name: r.payment.coach?.name ?? null,
-    }));
+    type Pay = {
+      id: string;
+      amount: number | string;
+      payment_date: string;
+      month: number;
+      year: number;
+      notes: string | null;
+      voided: boolean;
+      student: { name: string; school_class: string | null };
+      coach: { name: string } | null;
+    };
+
+    const rows: ReceiptRow[] = (data ?? [])
+      .map((r: { id: string; receipt_number: string; issued_at: string | null; voided: boolean | null; payments: Pay[] | null }) => {
+        const pays = r.payments ?? [];
+        if (pays.length === 0) {
+          // Receipt orphaned (shouldn't happen post-backfill). Skip.
+          return null;
+        }
+        const sorted = [...pays].sort((a, b) =>
+          a.year === b.year ? a.month - b.month : a.year - b.year
+        );
+        const total = pays.reduce((s, p) => s + Number(p.amount), 0);
+        const firstPaymentDate = [...pays]
+          .map((p) => p.payment_date)
+          .sort()[0];
+        const primary = pays[0];
+        const allVoided = pays.every((p) => p.voided);
+
+        return {
+          id: r.id,
+          receipt_number: r.receipt_number,
+          issued_at: r.issued_at,
+          total_amount: total,
+          payment_date: firstPaymentDate,
+          allocations: sorted.map((p) => ({
+            month: p.month,
+            year: p.year,
+            amount: Number(p.amount),
+          })),
+          student_name: primary.student.name,
+          school_class: primary.student.school_class ?? null,
+          notes: primary.notes,
+          voided: r.voided ?? false,
+          payment_voided: allVoided,
+          coach_name: primary.coach?.name ?? null,
+        } satisfies ReceiptRow;
+      })
+      .filter((r): r is ReceiptRow => r !== null);
 
     setReceipts(rows);
     setLoading(false);
   }, [supabase]);
+
+  function formatPeriod(allocations: ReceiptAllocation[]): string {
+    if (allocations.length === 0) return "-";
+    const years = new Set(allocations.map((a) => a.year));
+    if (years.size === 1) {
+      const y = [...years][0];
+      const months = [...new Set(allocations.map((a) => a.month))].sort(
+        (a, b) => a - b
+      );
+      return `${y}年${months.join("+")}月`;
+    }
+    // Cross-year (rare)
+    return allocations
+      .map((a) => `${a.year}/${a.month}`)
+      .join(", ");
+  }
 
   const fetchCreditNotes = useCallback(async () => {
     setCnLoading(true);
@@ -215,15 +268,17 @@ export function Receipts() {
   );
 
   function handlePrintReceipt(receipt: ReceiptRow) {
+    const first = receipt.allocations[0];
     const success = printReceiptHtml({
       receiptNumber: receipt.receipt_number,
       issuedAt: receipt.issued_at,
       date: receipt.payment_date,
       studentName: receipt.student_name,
       schoolClass: receipt.school_class,
-      amount: Number(receipt.amount),
-      month: receipt.month,
-      year: receipt.year,
+      amount: receipt.total_amount,
+      month: first?.month ?? 0,
+      year: first?.year ?? 0,
+      allocations: receipt.allocations,
       notes: receipt.notes,
       coachName: receipt.coach_name,
     });
@@ -236,7 +291,15 @@ export function Receipts() {
     setDeletingId(receipt.id);
     setConfirmDeleteReceipt(null);
 
-    // Delete receipt first, then payment
+    // Capture sibling payment ids before the FK link is dropped.
+    const { data: siblings } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("receipt_id", receipt.id);
+    const siblingIds = (siblings ?? []).map((s) => s.id);
+
+    // Delete receipt first (payments.receipt_id FK is ON DELETE SET NULL,
+    // and receipts.payment_id FK does not block us since we delete the child).
     const { error: rErr } = await supabase
       .from("receipts")
       .delete()
@@ -247,14 +310,16 @@ export function Receipts() {
       return;
     }
 
-    const { error: pErr } = await supabase
-      .from("payments")
-      .delete()
-      .eq("id", receipt.payment_id);
-    if (pErr) {
-      toast.error("删除付款记录失败（收据已删除，请联系管理员）");
-      setDeletingId(null);
-      return;
+    if (siblingIds.length > 0) {
+      const { error: pErr } = await supabase
+        .from("payments")
+        .delete()
+        .in("id", siblingIds);
+      if (pErr) {
+        toast.error("删除付款记录失败（收据已删除，请联系管理员）");
+        setDeletingId(null);
+        return;
+      }
     }
 
     toast.success("已删除撤回的收据和付款记录");
@@ -365,20 +430,26 @@ export function Receipts() {
                   ) : (
                     filtered.map((receipt) => {
                       const isVoided = receipt.voided || receipt.payment_voided;
+                      const isMulti = receipt.allocations.length >= 2;
                       return (
                         <TableRow key={receipt.id} className={isVoided ? "text-muted-foreground" : ""}>
                           <TableCell className={`font-mono text-sm whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
                             {receipt.receipt_number}
+                            {isMulti && !isVoided && (
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                {receipt.allocations.length}月
+                              </Badge>
+                            )}
                             {isVoided && (
                               <Badge variant="destructive" className="ml-2 text-xs">已撤回</Badge>
                             )}
                           </TableCell>
                           <TableCell className={isVoided ? "line-through" : ""}>{receipt.student_name}</TableCell>
                           <TableCell className={`whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
-                            {receipt.year}年{receipt.month}月
+                            {formatPeriod(receipt.allocations)}
                           </TableCell>
-                          <TableCell className={`text-right font-medium whitespace-nowrap ${isVoided ? "line-through" : ""}`}>
-                            {APP_CONFIG.currency} {Number(receipt.amount).toFixed(2)}
+                          <TableCell className={`text-right font-medium whitespace-nowrap tabular-nums ${isVoided ? "line-through" : ""}`}>
+                            {APP_CONFIG.currency} {receipt.total_amount.toFixed(2)}
                           </TableCell>
                           <TableCell className={isVoided ? "line-through" : ""}>
                             {receipt.coach_name ?? "-"}
